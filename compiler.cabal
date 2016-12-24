@@ -1,14 +1,14 @@
 name:                compiler
-version:             0.1.0.0
+version:             0.0.1.0
 synopsis:            Initial project template from stack
 description:         Please see README.md
 homepage:            https://github.com/githubuser/compiler#readme
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2016 Author name here
-category:            Web
+author:              Angus Thomsen
+maintainer:          aksthomsen@gmail.com
+copyright:           2016 Angus Thomsen
+category:            Compiler
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
@@ -19,6 +19,9 @@ library
                        JoScript.Data.Error,
                        JoScript.Data.BlockPass,
                        JoScript.Data.LexPass,
+                       JoScript.Data.Config,
+
+                       JoScript.Config.ArgParsing,
 
                        JoScript.Text.BlockPass
 
@@ -31,18 +34,19 @@ library
                        transformers,
                        containers,
                        conduit,
+                       optparse-applicative,
                        conduit-combinators
   default-language:    Haskell2010
   Default-Extensions:  NoImplicitPrelude
 
 
-executable compiler-exe
-  hs-source-dirs:      app
+executable client
+  hs-source-dirs:      client
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base
-                     , compiler
+  build-depends:       base, compiler
   default-language:    Haskell2010
+  Default-Extensions:  NoImplicitPrelude
 
 test-suite compiler-test
   type:                exitcode-stdio-1.0

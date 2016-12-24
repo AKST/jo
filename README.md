@@ -50,7 +50,6 @@ The type system is completely optional, as in you can turn it off.
 - Varient types
 - Record types
 - Immutable by default (like rust)
-- Dependant types
 - Global type inference
 
 ### Current syntax
@@ -118,18 +117,9 @@ be out of date but I try to keep this up to date.
 
 ## To build
 
-```sh
-make all
-```
+> TODO
 
 ## An Example
 
-```sh
-./build/src/main.native examples/simple.script
-```
-
-## Dependencies
-
-I don't particually understand the ocaml packaging ecosystem
-right now, but once I do I'll update this.
+> TODO
 

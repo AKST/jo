@@ -1,48 +1,46 @@
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 module JoScript.Text.BlockPass (runBlockPass) where
 
 
 import Prelude ((+), ($))
 import qualified Prelude as Std
 
-import qualified Data.Maybe as Maybe
-import qualified Data.Either as Either
-
 import Data.Eq
 import Data.Ord
-
 import Data.Word (Word64)
+import qualified Data.Maybe as Maybe
+import qualified Data.Either as Either
 import qualified Data.Text as T
 import qualified Data.Conduit as C
 
 import Control.Lens ((%=), (.=))
-import Control.Applicative
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except
-import Control.Monad.Identity
+import Control.Monad ((>>=), (>>))
+import Control.Applicative (pure)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Identity (Identity)
 import qualified Control.Monad.Trans.State as S
 
 import qualified JoScript.Data.Error as Error
-import JoScript.Data.BlockPass
+import JoScript.Data.BlockPass hiding (position)
 import JoScript.Data.Position ( Position(..)
                               , updatePosition
                               , initPosition
                               )
 
-data It where
-  Emit :: BlockPass -> It
-  Fail :: Error.IndentErrorT -> Position -> It
-  Exit :: It
-  Cont :: It
+data It
+  = Emit BlockPass
+  | Fail Error.IndentErrorT Position
+  | Exit
+  | Cont
 
-data Event where
-  Dedent  :: Word64 -> Position -> Event
-  Preline :: Event
-  InLine  :: Event
-  Finish  :: Event
+data Event
+  = Dedent Word64 Position
+  | Preline
+  | InLine
+  | Finish
 
 
 data State = PS { branch :: Event
@@ -57,14 +55,14 @@ type JoConduit = ConduitE Error.Error Std.Char BlockPass
 --                          Lens                            --
 --------------------------------------------------------------
 
-position' :: Functor f => (Position -> f Position) -> State -> f State
-position' f (PS branch position m) = fmap (\position'' -> PS branch position'' m) (f position)
+position' :: Std.Functor f => (Position -> f Position) -> State -> f State
+position' f (PS branch position m) = Std.fmap (\position'' -> PS branch position'' m) (f position)
 
-memory' :: Functor f => ([Word64] -> f [Word64]) -> State -> f State
-memory' f (PS branch position m) = fmap (\m'' -> PS branch position m'') (f m)
+memory' :: Std.Functor f => ([Word64] -> f [Word64]) -> State -> f State
+memory' f (PS branch position m) = Std.fmap (\m'' -> PS branch position m'') (f m)
 
-branch' :: Functor f => (Event -> f Event) -> State -> f State
-branch' f (PS branch position m) = fmap (\branch'' -> PS branch'' position m) (f branch)
+branch' :: Std.Functor f => (Event -> f Event) -> State -> f State
+branch' f (PS branch position m) = Std.fmap (\branch'' -> PS branch'' position m) (f branch)
 
 --------------------------------------------------------------
 --                      Entry point                         --
@@ -88,20 +86,20 @@ implentation =
     Fail e p  -> lift (C.yield (Either.Left e'))
       where e' = Error.known (Error.IndentError e) p
     Cont -> implentation
-    Exit -> return ()
+    Exit -> pure ()
 
 --------------------------------------------------------------
 --                      Event loop                          --
 --------------------------------------------------------------
 
 withEvent :: Event -> BlockLexer It
-withEvent Finish = return Exit
+withEvent Finish = pure Exit
 
 withEvent InLine = do
   initial  <- S.gets position
   consumed <- readWhile ((/=) '\n')
   branch'  .= Preline
-  return $
+  pure $
     if consumed == ""
       then Cont
       else Emit (Bp (BpLine consumed) initial)
@@ -110,19 +108,19 @@ withEvent (Dedent newIndent origin) =
   S.gets indentMemory >>= \case
 
     -- when the previous indent was top level
-    [] | newIndent /= 0 -> return (Fail Error.ShallowDedent origin)
-       | newIndent == 0 -> branch' .= InLine >> return Cont
+    [] | newIndent /= 0 -> pure (Fail Error.ShallowDedent origin)
+       | newIndent == 0 -> branch' .= InLine >> pure Cont
 
     -- when the previous indent was not top level
     lastIndent : others ->
       if newIndent < lastIndent then do
         memory' .= others
-        return (Emit (Bp BpDedent origin))
+        pure (Emit (Bp BpDedent origin))
       else if newIndent == lastIndent then do
         branch' .= InLine
-        return Cont
+        pure Cont
       else
-        return (Fail Error.ShallowDedent origin)
+        pure (Fail Error.ShallowDedent origin)
 
 withEvent Preline = do
   initial <- S.gets position
@@ -130,14 +128,14 @@ withEvent Preline = do
   current <- currentIndent
   if indent == current then do
     branch' .= InLine
-    return Cont
+    pure Cont
   else if indent > current then do
     branch' .= InLine
     memory' %= ((:) indent)
-    return (Emit (Bp BpIndent initial))
+    pure (Emit (Bp BpIndent initial))
   else do
     branch' .= (Dedent indent initial)
-    return Cont
+    pure Cont
 
 --------------------------------------------------------------
 --                        Util func                         --
@@ -156,13 +154,13 @@ consumeWhile consumePred = iter 0 T.empty where
     Maybe.Nothing -> pure (n, t)
 
 countWhile :: (Std.Char -> Std.Bool) -> BlockLexer Word64
-countWhile f = fmap Std.fst (consumeWhile f)
+countWhile f = Std.fmap Std.fst (consumeWhile f)
 
 readWhile :: (Std.Char -> Std.Bool) -> BlockLexer T.Text
-readWhile f = fmap Std.snd (consumeWhile f)
+readWhile f = Std.fmap Std.snd (consumeWhile f)
 
 currentIndent :: BlockLexer Word64
 currentIndent = S.gets indentMemory >>= \case
-  current:_ -> return current
-  [       ] -> return 0
+  current:_ -> pure current
+  [       ] -> pure 0
 

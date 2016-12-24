@@ -5,7 +5,7 @@
 module JoScript.Text.BlockPass (runBlockPass) where
 
 
-import Prelude ((+), ($))
+import Prelude ((+), ($), flip)
 import qualified Prelude as Std
 
 import Data.Eq
@@ -15,10 +15,11 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Either as Either
 import qualified Data.Text as T
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as C
 
 import Control.Lens ((%=), (.=))
-import Control.Monad ((>>=), (>>))
-import Control.Applicative (pure)
+import Control.Monad ((>>=), (>>), Monad, when)
+import Control.Applicative (pure, (<*))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Identity (Identity)
 import qualified Control.Monad.Trans.State as S
@@ -35,20 +36,23 @@ data It
   | Fail Error.IndentErrorT Position
   | Exit
   | Cont
+  deriving Std.Show
 
 data Event
   = Dedent Word64 Position
   | Preline
   | InLine
   | Finish
+  deriving Std.Show
 
 
 data State = PS { branch :: Event
                 , position :: Position
                 , indentMemory :: [Word64]
                 }
+  deriving Std.Show
 
-type ConduitE e i o = C.ConduitM i (Either.Either e o) Identity
+type ConduitE e i o = C.ConduitM i (Either.Either e o)
 type JoConduit = ConduitE Error.Error Std.Char BlockPass
 
 --------------------------------------------------------------
@@ -68,7 +72,7 @@ branch' f (PS branch position m) = Std.fmap (\branch'' -> PS branch'' position m
 --                      Entry point                         --
 --------------------------------------------------------------
 
-runBlockPass :: JoConduit ()
+runBlockPass :: Monad m => JoConduit m ()
 runBlockPass = S.evalStateT implentation initial
 
 initial :: State
@@ -77,32 +81,37 @@ initial = PS { branch = Preline
              , indentMemory = []
              }
 
-type BlockLexer = S.StateT State JoConduit
+type BlockLexer m = S.StateT State (JoConduit m)
 
-implentation :: BlockLexer ()
-implentation =
+implentation :: Monad m => BlockLexer m ()
+implentation = do
+  state <- S.get
   S.gets branch >>= withEvent >>= \case
-    Emit pass -> lift (C.yield (Either.Right pass)) >> implentation
-    Fail e p  -> lift (C.yield (Either.Left e'))
-      where e' = Error.known (Error.IndentError e) p
-    Cont -> implentation
-    Exit -> pure ()
+    Cont -> do
+      empty <- lift C.null
+      when empty (branch' .= Finish)
+      implentation
+    Emit pass -> do
+      yieldElem pass
+      implentation
+    Fail e p -> do
+      yieldError (Error.known (Error.IndentError e) p)
+    Exit -> do
+      position <- S.gets position
+      yieldElem (Bp BpEnd position)
 
 --------------------------------------------------------------
 --                      Event loop                          --
 --------------------------------------------------------------
 
-withEvent :: Event -> BlockLexer It
+withEvent :: Monad m => Event -> BlockLexer m It
 withEvent Finish = pure Exit
 
 withEvent InLine = do
   initial  <- S.gets position
-  consumed <- readWhile ((/=) '\n')
+  consumed <- readWhile ((/=) '\n') <* consumeNext
   branch'  .= Preline
-  pure $
-    if consumed == ""
-      then Cont
-      else Emit (Bp (BpLine consumed) initial)
+  pure (if consumed == "" then Cont else Emit (Bp (BpLine consumed) initial))
 
 withEvent (Dedent newIndent origin) =
   S.gets indentMemory >>= \case
@@ -141,7 +150,11 @@ withEvent Preline = do
 --                        Util func                         --
 --------------------------------------------------------------
 
-consumeWhile :: (Std.Char -> Std.Bool) -> BlockLexer (Word64, T.Text)
+yieldElem e = lift (C.yield (Either.Right e))
+
+yieldError e = lift (C.yield (Either.Left e))
+
+consumeWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m (Word64, T.Text)
 consumeWhile consumePred = iter 0 T.empty where
   iter n t = lift C.await >>= \case
     Maybe.Just input ->
@@ -153,14 +166,21 @@ consumeWhile consumePred = iter 0 T.empty where
         pure (n, t)
     Maybe.Nothing -> pure (n, t)
 
-countWhile :: (Std.Char -> Std.Bool) -> BlockLexer Word64
+countWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m Word64
 countWhile f = Std.fmap Std.fst (consumeWhile f)
 
-readWhile :: (Std.Char -> Std.Bool) -> BlockLexer T.Text
+readWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m T.Text
 readWhile f = Std.fmap Std.snd (consumeWhile f)
 
-currentIndent :: BlockLexer Word64
+currentIndent :: Monad m => BlockLexer m Word64
 currentIndent = S.gets indentMemory >>= \case
   current:_ -> pure current
   [       ] -> pure 0
+
+consumeNext :: Monad m => BlockLexer m ()
+consumeNext = lift C.await >>= \case
+  Maybe.Nothing -> pure ()
+  Maybe.Just c  -> do
+    position' %= updatePosition c
+    pure ()
 

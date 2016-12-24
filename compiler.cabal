@@ -18,11 +18,14 @@ library
   exposed-modules:     JoScript.Data.Position,
                        JoScript.Data.Error,
                        JoScript.Data.BlockPass,
+                       JoScript.Data.LexPass,
+
                        JoScript.Text.BlockPass
 
   build-depends:       base >= 4.7 && < 5,
                        mtl,
                        lens,
+                       aeson,
                        text,
                        bytestring,
                        transformers,
@@ -30,6 +33,8 @@ library
                        conduit,
                        conduit-combinators
   default-language:    Haskell2010
+  Default-Extensions:  NoImplicitPrelude
+
 
 executable compiler-exe
   hs-source-dirs:      app

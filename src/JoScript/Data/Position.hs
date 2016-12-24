@@ -1,30 +1,52 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 module JoScript.Data.Position ( Position(..)
                               , initPosition
                               , updatePosition
                               ) where
 
-import Data.Word (Word64)
-import Data.Text (Text)
-import qualified Data.Text as T
+import Prelude (Show, Char, (+))
 
-data Position = Pos { _line :: Word64, _column :: Word64 }
+import Control.Applicative ((<*>), (<$>))
+
+import qualified Data.Aeson as A
+import Data.Aeson ((.=), (.:))
+import Data.Monoid ((<>), mempty)
+import Data.Word (Word64)
+
+data Position = Position { line :: Word64, column :: Word64 }
   deriving Show
 
 startIndex :: Word64
 startIndex = 1
 
 initPosition :: Position
-initPosition = Pos startIndex startIndex
+initPosition = Position startIndex startIndex
 
 onNewline :: Position -> Position
-onNewline (Pos l _) = Pos (l + 1) startIndex
+onNewline (Position l _) = Position (l + 1) startIndex
 
 moveRight :: Position -> Position
-moveRight (Pos l c) = Pos l (c + 1)
+moveRight (Position l c) = Position l (c + 1)
 
 updatePosition :: Char -> Position -> Position
 updatePosition '\n' = onNewline
 updatePosition _ = moveRight
+
+instance A.ToJSON Position where
+  toJSON (Position line column) =
+    A.object ["line" .= line, "column" .= column]
+
+  toEncoding Position{..} =
+    A.pairs ("line" .= line <> "column" .= column)
+
+instance A.FromJSON Position where
+  parseJSON (A.Object o) =
+    Position <$> o .: "line"
+             <*> o .: "column"
+  parseJSON _ = mempty
+
+
 
 -- class PositionShifts t where
 --   shiftWith :: a -> Position -> Position
@@ -32,9 +54,8 @@ updatePosition _ = moveRight
 -- instance PositionShifts Text where
 --   shiftWith text pos = iter 0 pos where
 --     tlen = T.length text
---     iter i (Pos line column)
---       | i >= length = Pos line column
+--     iter i (Position line column)
+--       | i >= length = Position line column
 --       | otherwise =
---         let update = if Text.
 
 

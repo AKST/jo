@@ -23,6 +23,9 @@ library
 
                        JoScript.Config.ArgParsing,
 
+                       JoScript.Job,
+                       JoScript.Job.Build,
+
                        JoScript.Text.BlockPass
 
   build-depends:       base >= 4.7 && < 5,
@@ -30,6 +33,7 @@ library
                        lens,
                        aeson,
                        text,
+                       directory,
                        bytestring,
                        transformers,
                        containers,

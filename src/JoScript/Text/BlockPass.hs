@@ -5,55 +5,49 @@
 module JoScript.Text.BlockPass (runBlockPass) where
 
 
-import Prelude ((+), ($), flip)
+import Prelude ((+), ($), flip, Char)
 import qualified Prelude as Std
 
 import Data.Eq
 import Data.Ord
 import Data.Word (Word64)
-import qualified Data.Maybe as Maybe
-import qualified Data.Either as Either
+import Data.Maybe (Maybe(..))
+import Data.Either (Either(..))
 import qualified Data.Text as T
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 
-import Control.Lens ((%=), (.=))
-import Control.Monad ((>>=), (>>), Monad, when)
+import Control.Lens ((%=), (.=), use)
+import Control.Monad ((>>=), (>>), Monad, unless)
 import Control.Applicative (pure, (<*))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Identity (Identity)
+import qualified Control.Monad.Trans.Except as E
 import qualified Control.Monad.Trans.State as S
 
-import qualified JoScript.Data.Error as Error
+import JoScript.Data.Error ( Error(..)
+                           , Repr(IndentError)
+                           , IndentErrorT(..)
+                           , known
+                           )
+import JoScript.Util.Conduit (ConduitE, ResultConduit)
 import JoScript.Data.BlockPass hiding (position)
 import JoScript.Data.Position ( Position(..)
                               , updatePosition
                               , initPosition
                               )
 
-data It
-  = Emit BlockPass
-  | Fail Error.IndentErrorT Position
-  | Exit
-  | Cont
-  deriving Std.Show
-
-data Event
+data Branch
   = Dedent Word64 Position
   | Preline
   | InLine
-  | Finish
   deriving Std.Show
 
-
-data State = PS { branch :: Event
+data State = PS { branch :: Branch
                 , position :: Position
                 , indentMemory :: [Word64]
                 }
   deriving Std.Show
-
-type ConduitE e i o = C.ConduitM i (Either.Either e o)
-type JoConduit = ConduitE Error.Error Std.Char BlockPass
 
 --------------------------------------------------------------
 --                          Lens                            --
@@ -65,15 +59,22 @@ position' f (PS branch position m) = Std.fmap (\position'' -> PS branch position
 memory' :: Std.Functor f => ([Word64] -> f [Word64]) -> State -> f State
 memory' f (PS branch position m) = Std.fmap (\m'' -> PS branch position m'') (f m)
 
-branch' :: Std.Functor f => (Event -> f Event) -> State -> f State
+branch' :: Std.Functor f => (Branch -> f Branch) -> State -> f State
 branch' f (PS branch position m) = Std.fmap (\branch'' -> PS branch'' position m) (f branch)
 
 --------------------------------------------------------------
 --                      Entry point                         --
 --------------------------------------------------------------
 
-runBlockPass :: Monad m => JoConduit m ()
-runBlockPass = S.evalStateT implentation initial
+type BlockConduit = ResultConduit Char BlockPass
+type BlockLexer m = E.ExceptT Error (S.StateT State (BlockConduit m))
+
+runBlockPass :: Monad m => BlockConduit m ()
+runBlockPass =
+  let s = E.runExceptT loop
+   in S.evalStateT s initial >>= \case
+      Right _____ -> pure ()
+      Left except -> C.yield (Left except)
 
 initial :: State
 initial = PS { branch = Preline
@@ -81,90 +82,75 @@ initial = PS { branch = Preline
              , indentMemory = []
              }
 
-type BlockLexer m = S.StateT State (JoConduit m)
-
-implentation :: Monad m => BlockLexer m ()
-implentation = do
-  state <- S.get
-  S.gets branch >>= withEvent >>= \case
-    Cont -> do
-      empty <- lift C.null
-      when empty (branch' .= Finish)
-      implentation
-    Emit pass -> do
-      yieldElem pass
-      implentation
-    Fail e p -> do
-      yieldError (Error.known (Error.IndentError e) p)
-    Exit -> do
-      position <- S.gets position
-      yieldElem (Bp BpEnd position)
-
 --------------------------------------------------------------
 --                      Event loop                          --
 --------------------------------------------------------------
 
-withEvent :: Monad m => Event -> BlockLexer m It
-withEvent Finish = pure Exit
+loop :: Monad m => BlockLexer m ()
+loop = do
+  empty <- lift (lift C.null)
+  if empty then do
+    position <- use position'
+    yieldElem (Bp BpEnd position)
+  else do
+    branch <- use branch'
+    withBranch branch
+    loop
 
-withEvent InLine = do
-  initial  <- S.gets position
-  consumed <- readWhile ((/=) '\n') <* consumeNext
-  branch'  .= Preline
-  pure (if consumed == "" then Cont else Emit (Bp (BpLine consumed) initial))
-
-withEvent (Dedent newIndent origin) =
-  S.gets indentMemory >>= \case
-
-    -- when the previous indent was top level
-    [] | newIndent /= 0 -> pure (Fail Error.ShallowDedent origin)
-       | newIndent == 0 -> branch' .= InLine >> pure Cont
-
-    -- when the previous indent was not top level
-    lastIndent : others ->
-      if newIndent < lastIndent then do
-        memory' .= others
-        pure (Emit (Bp BpDedent origin))
-      else if newIndent == lastIndent then do
-        branch' .= InLine
-        pure Cont
-      else
-        pure (Fail Error.ShallowDedent origin)
-
-withEvent Preline = do
-  initial <- S.gets position
+withBranch :: Monad m => Branch -> BlockLexer m ()
+withBranch Preline = do
+  initial <- use position'
   indent  <- countWhile ((==) ' ')
   current <- currentIndent
   if indent == current then do
     branch' .= InLine
-    pure Cont
   else if indent > current then do
     branch' .= InLine
     memory' %= ((:) indent)
-    pure (Emit (Bp BpIndent initial))
+    yieldElem (Bp BpIndent initial)
   else do
     branch' .= (Dedent indent initial)
-    pure Cont
+
+withBranch InLine = do
+  initial  <- use position'
+  consumed <- readWhile ((/=) '\n') <* consumeNext
+  branch'  .= Preline
+  unless (consumed == "") $
+    yieldElem (Bp (BpLine consumed) initial)
+
+withBranch (Dedent newIndent origin) = use memory' >>= \case
+  -- when the previous indent was top level
+  [] | newIndent /= 0 -> E.throwE (known (IndentError ShallowDedent) origin)
+     | newIndent == 0 -> branch' .= InLine
+
+  -- when the previous indent was not top level
+  lastIndent : others ->
+    if newIndent < lastIndent then do
+      memory' .= others
+      yieldElem (Bp BpDedent origin)
+    else if newIndent == lastIndent
+      then branch' .= InLine
+      else E.throwE (known (IndentError ShallowDedent) origin)
 
 --------------------------------------------------------------
 --                        Util func                         --
 --------------------------------------------------------------
 
-yieldElem e = lift (C.yield (Either.Right e))
-
-yieldError e = lift (C.yield (Either.Left e))
+yieldElem :: Monad m => BlockPass -> BlockLexer m ()
+yieldElem e = lift (lift (C.yield (Right e)))
 
 consumeWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m (Word64, T.Text)
-consumeWhile consumePred = iter 0 T.empty where
-  iter n t = lift C.await >>= \case
-    Maybe.Just input ->
-      if consumePred input then do
+consumeWhile predicate = iter 0 T.empty where
+  iter n t = lift (lift C.await) >>= \case
+    Just (Left except) -> E.throwE except
+    Just (Right input) ->
+      if predicate input then do
         position' %= updatePosition input
         iter (n + 1) (T.snoc t input)
       else do
-        lift (C.leftover input)
+        lift (lift (C.leftover (Right input)))
         pure (n, t)
-    Maybe.Nothing -> pure (n, t)
+    Nothing -> pure (n, t)
 
 countWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m Word64
 countWhile f = Std.fmap Std.fst (consumeWhile f)
@@ -173,14 +159,13 @@ readWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m T.Text
 readWhile f = Std.fmap Std.snd (consumeWhile f)
 
 currentIndent :: Monad m => BlockLexer m Word64
-currentIndent = S.gets indentMemory >>= \case
+currentIndent = use memory' >>= \case
   current:_ -> pure current
   [       ] -> pure 0
 
 consumeNext :: Monad m => BlockLexer m ()
-consumeNext = lift C.await >>= \case
-  Maybe.Nothing -> pure ()
-  Maybe.Just c  -> do
-    position' %= updatePosition c
-    pure ()
+consumeNext = lift (lift C.await) >>= \case
+  Nothing               -> pure ()
+  Just (Left exception) -> E.throwE exception
+  Just (Right c)        -> position' %= updatePosition c
 

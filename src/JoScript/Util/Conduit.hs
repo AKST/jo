@@ -2,8 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module JoScript.Util.Conduit ( characterStream
                              , printAsJSON
+                             , ConduitE
+                             , ResultConduit
                              ) where
 
+import Prelude ((.))
 import qualified Prelude as Std
 import qualified Conduit as StdCon
 
@@ -12,7 +15,7 @@ import Control.Monad (Monad, (>>=), (>>))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 
 import Data.Void (Void)
-import Data.Conduit ((=$=), (.|))
+import Data.Conduit ((=$=), (.|), mapOutput)
 import Data.Conduit.List (mapFoldable)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
@@ -28,8 +31,13 @@ import System.IO (FilePath)
 import JoScript.Data.Error (Error)
 import qualified JoScript.Util.Text as TUtil
 
-characterStream :: StdCon.MonadResource m => FilePath -> C.Source m Std.Char
-characterStream f = StdCon.sourceFile f .| mapFoldable LT.unpack
+
+type ConduitE e i o = C.ConduitM (Either e i) (Either e o)
+type ResultConduit i o = ConduitE Error i o
+
+
+characterStream :: StdCon.MonadResource m => FilePath -> C.Source m (Either Error Std.Char)
+characterStream f = mapOutput Right (StdCon.sourceFile f .| mapFoldable LT.unpack)
 
 
 printAsJSON :: (StdCon.MonadResource m, A.ToJSON v) => C.Sink (Either Error v) m ()

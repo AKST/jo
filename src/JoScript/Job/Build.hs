@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 module JoScript.Job.Build (build) where
 
 import qualified Conduit as StdCon
@@ -26,7 +27,8 @@ build debug files = forM_ files (handler debug) where
   handler :: Maybe DebugMode -> FilePath -> IO ()
   handler Nothing __    = pure ()
   handler (Just mode) f = C.runConduitRes (withFile mode) where
-    withFile DebugTextBlock = withBlockPass f .| printAsJSON
+    withFile DebugTextBlock = withBlockPass f
+                           .| printAsJSON "debug/???"
 
   withBlockPass file = characterStream file .| runBlockPass
 

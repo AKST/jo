@@ -18,6 +18,11 @@ data DebugMode
   | DebugTextParse
   deriving (Show)
 
+debugText :: DebugMode -> Text
+debugText DebugTextBlock = "debug/block"
+debugText DebugTextLexer = "debug/lexer"
+debugText DebugTextParse = "debug/parse"
+
 versionStr :: Text
 versionStr = "0.0.1"
 

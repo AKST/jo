@@ -88,7 +88,7 @@ initial = PS { branch = Preline
 
 loop :: Monad m => BlockLexer m ()
 loop = do
-  empty <- lift (lift C.null)
+  empty <- liftConduit C.null
   if empty then do
     position <- use position'
     yieldElem (Bp BpEnd position)
@@ -137,18 +137,18 @@ withBranch (Dedent newIndent origin) = use memory' >>= \case
 --------------------------------------------------------------
 
 yieldElem :: Monad m => BlockPass -> BlockLexer m ()
-yieldElem e = lift (lift (C.yield (Right e)))
+yieldElem e = liftConduit (C.yield (Right e))
 
 consumeWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m (Word64, T.Text)
 consumeWhile predicate = iter 0 T.empty where
-  iter n t = lift (lift C.await) >>= \case
+  iter n t = liftConduit C.await >>= \case
     Just (Left except) -> E.throwE except
     Just (Right input) ->
       if predicate input then do
         position' %= updatePosition input
         iter (n + 1) (T.snoc t input)
       else do
-        lift (lift (C.leftover (Right input)))
+        liftConduit (C.leftover (Right input))
         pure (n, t)
     Nothing -> pure (n, t)
 
@@ -164,8 +164,17 @@ currentIndent = use memory' >>= \case
   [       ] -> pure 0
 
 consumeNext :: Monad m => BlockLexer m ()
-consumeNext = lift (lift C.await) >>= \case
+consumeNext = liftConduit C.await >>= \case
   Nothing               -> pure ()
   Just (Left exception) -> E.throwE exception
   Just (Right c)        -> position' %= updatePosition c
+
+
+--------------------------------------------------------------
+--                        Wrap func                         --
+--------------------------------------------------------------
+
+{- whenever the monad stack is modified we'll only need
+ - to update the lifting of conduit function calls here -}
+liftConduit m = lift (lift m)
 

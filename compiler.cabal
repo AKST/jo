@@ -18,7 +18,7 @@ library
   exposed-modules:     JoScript.Data.Position,
                        JoScript.Data.Error,
                        JoScript.Data.BlockPass,
-                       JoScript.Data.LexPass,
+                       JoScript.Data.LexerPass,
                        JoScript.Data.Config,
 
                        JoScript.Config.ArgParsing,
@@ -30,6 +30,7 @@ library
                        JoScript.Util.Json,
                        JoScript.Util.Conduit,
 
+                       JoScript.Text.LexerPass,
                        JoScript.Text.BlockPass
 
   build-depends:       base >= 4.7 && < 5,

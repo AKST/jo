@@ -68,6 +68,7 @@ trim = withState Init T.empty where
 data DocS = D { dBranch :: DocBranch, dOut :: Doc }
 data DocBranch = AnyD | Word Text
 
+{-- # transforms a string into a document --}
 toDocument :: String -> Doc
 toDocument input = impl (D AnyD L.empty) input where
 
@@ -99,7 +100,7 @@ toDocument input = impl (D AnyD L.empty) input where
     xss               -> impl ((insert (text buff) . set branch AnyD) acc) xss
 
 
-
+{-- # multiline string template --}
 multiline :: QuasiQuoter
 multiline = Quote.QuasiQuoter
   { Quote.quoteExp  = withExp . trim

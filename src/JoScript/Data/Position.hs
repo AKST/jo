@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 module JoScript.Data.Position ( Position(..)
-                              , initPosition
-                              , updatePosition
+                              , init
+                              , update
+                              , moveOver
                               ) where
 
 import Prelude (Show, Char, (+))
@@ -10,9 +12,12 @@ import Prelude (Show, Char, (+))
 import Control.Applicative ((<*>), (<$>))
 
 import qualified Data.Aeson as A
+import Data.Maybe(Maybe(..))
 import Data.Aeson ((.=), (.:))
 import Data.Monoid ((<>), mempty)
 import Data.Word (Word64)
+import Data.Text (Text)
+import qualified Data.Text as T
 
 data Position = Position { line :: Word64, column :: Word64 }
   deriving Show
@@ -20,8 +25,8 @@ data Position = Position { line :: Word64, column :: Word64 }
 startIndex :: Word64
 startIndex = 1
 
-initPosition :: Position
-initPosition = Position startIndex startIndex
+init :: Position
+init = Position startIndex startIndex
 
 onNewline :: Position -> Position
 onNewline (Position l _) = Position (l + 1) startIndex
@@ -29,9 +34,13 @@ onNewline (Position l _) = Position (l + 1) startIndex
 moveRight :: Position -> Position
 moveRight (Position l c) = Position l (c + 1)
 
-updatePosition :: Char -> Position -> Position
-updatePosition '\n' = onNewline
-updatePosition _ = moveRight
+update :: Char -> Position -> Position
+update '\n' = onNewline
+update _ = moveRight
+
+moveOver :: Text -> Position -> Position
+moveOver (T.uncons -> Nothing)     p = p
+moveOver (T.uncons -> Just (h, t)) p = update h p
 
 instance A.ToJSON Position where
   toJSON (Position line column) =

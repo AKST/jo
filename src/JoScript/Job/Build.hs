@@ -10,6 +10,7 @@ import Data.Maybe (Maybe(..))
 import Data.Conduit ((=$=), (.|))
 import qualified Data.Conduit as C
 import qualified Data.Foldable as F
+import qualified Data.Aeson as A
 
 import Control.Applicative (pure)
 import Control.Monad (forM_, (>>=))
@@ -20,6 +21,7 @@ import System.Directory (doesFileExist)
 
 import JoScript.Data.Config (DebugMode(..), debugModeText)
 import JoScript.Text.BlockPass (runBlockPass)
+import JoScript.Text.LexerPass (runLexerPass)
 import JoScript.Util.Conduit (characterStream, printAsJSON)
 
 build :: Maybe DebugMode -> [FilePath] -> IO ()
@@ -27,10 +29,11 @@ build debug files = forM_ files (handler debug) where
   handler :: Maybe DebugMode -> FilePath -> IO ()
   handler Nothing __    = pure ()
   handler (Just mode) f = C.runConduitRes (withFile mode) where
-    withFile DebugTextBlock = withBlockPass f
-                           .| printAsJSON (debugModeText mode)
+    withFile DebugTextBlock = withBlockPass f .| printAsJSON (debugModeText mode)
+    withFile DebugTextLexer = withLexerPass f .| printAsJSON (debugModeText mode)
 
   withBlockPass file = characterStream file .| runBlockPass
+  withLexerPass file = withBlockPass file   .| runLexerPass
 
 checkFilesExist :: [FilePath] -> IO ()
 checkFilesExist files = result where

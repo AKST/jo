@@ -26,11 +26,13 @@ data BpRepr
   deriving Show
 
 instance A.ToJSON BlockPass where
-  toJSON Bp{..} = A.object ["position" .= position, "repr" .= encode repr] where
-    encode (BpLine text) = A.object ["type" .= ("line"   :: Text), "data" .= text]
-    encode BpIndent      = A.object ["type" .= ("indent" :: Text)]
-    encode BpDedent      = A.object ["type" .= ("dedent" :: Text)]
-    encode BpEnd         = A.object ["type" .= ("end"    :: Text)]
+  toJSON Bp{..} = A.object ["position" .= position, "repr" .= repr]
+
+instance A.ToJSON BpRepr where
+  toJSON (BpLine text) = A.object ["type" .= ("line"   :: Text), "data" .= text]
+  toJSON BpIndent      = A.object ["type" .= ("indent" :: Text)]
+  toJSON BpDedent      = A.object ["type" .= ("dedent" :: Text)]
+  toJSON BpEnd         = A.object ["type" .= ("end"    :: Text)]
 
 instance A.FromJSON BlockPass where
   parseJSON (A.Object o) = do

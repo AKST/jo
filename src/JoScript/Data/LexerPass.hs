@@ -12,7 +12,7 @@ import JoScript.Util.Json (withObject)
 import qualified Data.Aeson as A
 
 
-data LexerPass = Lp { repr :: LpKind, position :: Position }
+data LexerPass = Lp { repr :: LpRepr, position :: Position }
   deriving Show
 
 data LpNumber
@@ -20,46 +20,49 @@ data LpNumber
   | LpFloat Float
   deriving Show
 
-data LpKind
-  = LkEnd
-  | LkSpace Word64
-  | LkNewline
-  | LkIndent
-  | LkDedent
-  | LkPipe
-  | LkBraceL
-  | LkBraceR
-  | LkQuote
-  | LkColon
-  | LkAssign
-  | LkRestOperator
-  | LkDotOperator
-  | LkDecoratorPrefix
-  | LkIdentifier Text
-  | LkNumberLit LpNumber
-  | LkString Text
-  | LkComment Text
+data LpRepr
+  = LpEnd
+  | LpSpace Word64
+  | LpNewline
+  | LpIndent
+  | LpDedent
+  | LpPipe
+  | LpBraceL
+  | LpBraceR
+  | LpQuote
+  | LpColon
+  | LpAssign
+  | LpRestOperator
+  | LpDotOperator
+  | LpDecoratorPrefix
+  | LpIdentifier Text
+  | LpNumberLit LpNumber
+  | LpString Text
+  | LpComment Text
   deriving Show
 
-toToken :: LpKind -> Position -> LexerPass
+toToken :: LpRepr -> Position -> LexerPass
 toToken k p = Lp k p
 
-kindName :: LpKind -> Text
-kindName LkEnd    = "end"
-kindName LkIndent = "indent"
-kindName LkDedent = "dedent"
-kindName LkPipe   = "pipe"
-kindName LkBraceL = "brace-l"
-kindName LkBraceR = "brace-r"
-kindName LkQuote  = "quote"
-kindName LkColon  = "colon"
-kindName LkAssign = "assign"
-kindName (LkString _) = "string"
-kindName (LkComment _) = "comment"
-kindName LkRestOperator = "rest"
-kindName (LkIdentifier _) = "identifier"
-kindName (LkNumberLit (LpInteger _)) = "number:integer"
-kindName (LkNumberLit (LpFloat   _)) = "number:float"
+kindName :: LpRepr -> Text
+kindName LpEnd    = "end"
+kindName LpIndent = "indent"
+kindName LpDedent = "dedent"
+kindName LpNewline = "newline"
+kindName LpPipe   = "pipe"
+kindName LpBraceL = "brace-l"
+kindName LpBraceR = "brace-r"
+kindName LpQuote  = "quote"
+kindName LpColon  = "colon"
+kindName LpAssign = "assign"
+kindName (LpSpace _) = "space"
+kindName (LpString _) = "string"
+kindName (LpComment _) = "comment"
+kindName LpRestOperator = "rest"
+kindName LpDotOperator = "."
+kindName (LpIdentifier _) = "identifier"
+kindName (LpNumberLit (LpInteger _)) = "number:integer"
+kindName (LpNumberLit (LpFloat   _)) = "number:float"
 
 
 instance A.ToJSON LexerPass where
@@ -67,11 +70,11 @@ instance A.ToJSON LexerPass where
     default' :: A.Value
     default' = A.object ["type" .= kindName repr]
 
-    encode (LkString s)                = withObject ["value" .= s] default'
-    encode (LkComment c)               = withObject ["value" .= c] default'
-    encode (LkIdentifier i)            = withObject ["value" .= i] default'
-    encode (LkNumberLit (LpFloat f))   = withObject ["value" .= f] default'
-    encode (LkNumberLit (LpInteger i)) = withObject ["value" .= i] default'
+    encode (LpString s)                = withObject ["value" .= s] default'
+    encode (LpComment c)               = withObject ["value" .= c] default'
+    encode (LpIdentifier i)            = withObject ["value" .= i] default'
+    encode (LpNumberLit (LpFloat f))   = withObject ["value" .= f] default'
+    encode (LpNumberLit (LpInteger i)) = withObject ["value" .= i] default'
     encode _                           = default'
 
 

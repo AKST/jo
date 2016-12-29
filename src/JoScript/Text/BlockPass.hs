@@ -32,10 +32,8 @@ import JoScript.Data.Error ( Error(..)
                            )
 import JoScript.Util.Conduit (ConduitE, ResultConduit)
 import JoScript.Data.BlockPass hiding (position)
-import JoScript.Data.Position ( Position(..)
-                              , updatePosition
-                              , initPosition
-                              )
+import JoScript.Data.Position (Position(..))
+import qualified JoScript.Data.Position as Position
 
 data Branch
   = Dedent Word64 Position
@@ -78,7 +76,7 @@ runBlockPass =
 
 initial :: State
 initial = PS { branch = Preline
-             , position = initPosition
+             , position = Position.init
              , indentMemory = []
              }
 
@@ -145,7 +143,7 @@ consumeWhile predicate = iter 0 T.empty where
     Just (Left except) -> E.throwE except
     Just (Right input) ->
       if predicate input then do
-        position' %= updatePosition input
+        position' %= Position.update input
         iter (n + 1) (T.snoc t input)
       else do
         liftConduit (C.leftover (Right input))
@@ -167,7 +165,7 @@ consumeNext :: Monad m => BlockLexer m ()
 consumeNext = liftConduit C.await >>= \case
   Nothing               -> pure ()
   Just (Left exception) -> E.throwE exception
-  Just (Right c)        -> position' %= updatePosition c
+  Just (Right c)        -> position' %= Position.update c
 
 
 --------------------------------------------------------------

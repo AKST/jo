@@ -19,18 +19,18 @@ import System.IO (IO, FilePath, print)
 import System.Exit (die)
 import System.Directory (doesFileExist)
 
-import JoScript.Data.Config (DebugMode(..), debugModeText)
+import JoScript.Data.Config (DebugMode(..), DebugKind(..), debugModeText)
 import JoScript.Text.BlockPass (runBlockPass)
 import JoScript.Text.LexerPass (runLexerPass)
-import JoScript.Util.Conduit (characterStream, printAsJSON)
+import JoScript.Util.Conduit (characterStream, printDebug)
 
 build :: Maybe DebugMode -> [FilePath] -> IO ()
 build debug files = forM_ files (handler debug) where
   handler :: Maybe DebugMode -> FilePath -> IO ()
   handler Nothing __    = pure ()
-  handler (Just mode) f = C.runConduitRes (withFile mode) where
-    withFile DebugTextBlock = withBlockPass f .| printAsJSON (debugModeText mode)
-    withFile DebugTextLexer = withLexerPass f .| printAsJSON (debugModeText mode)
+  handler (Just m@(Debug mode _)) f = C.runConduitRes (withFile mode) where
+    withFile DebugTextBlock = withBlockPass f .| printDebug m
+    withFile DebugTextLexer = withLexerPass f .| printDebug m
 
   withBlockPass file = characterStream file .| runBlockPass
   withLexerPass file = withBlockPass file   .| runLexerPass

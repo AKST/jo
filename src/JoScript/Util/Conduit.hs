@@ -2,7 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 module JoScript.Util.Conduit ( characterStream
-                             , printAsJSON
+                             , printDebug
                              , ConduitE
                              , ResultConduit
                              ) where
@@ -21,6 +21,7 @@ import qualified Control.Monad.Trans.Writer as W
 import Data.Void (Void)
 import Data.Monoid ((<>))
 import Data.Aeson ((.=))
+import qualified Data.Aeson.Encode.Pretty as A
 import qualified Data.Aeson as A
 import Data.Conduit ((=$=), (.|), mapOutput)
 import Data.Conduit.List (mapFoldable)
@@ -34,6 +35,7 @@ import qualified Data.Text.Lazy as LT
 import System.IO (FilePath)
 
 import JoScript.Data.Error (Error)
+import JoScript.Data.Config (DebugMode(..), debugModeText)
 import qualified JoScript.Util.Json as Json
 import qualified JoScript.Util.Text as TUtil
 
@@ -47,8 +49,8 @@ characterStream f = mapOutput Right (StdCon.sourceFile f .| mapFoldable LT.unpac
 
 type Tldr m v = (StdCon.MonadResource m, A.ToJSON v)
 
-printAsJSON :: (StdCon.MonadResource m, A.ToJSON v) => T.Text -> C.Sink (Either Error v) m ()
-printAsJSON type' = impl where
+printDebug :: (StdCon.MonadResource m, A.ToJSON v) => DebugMode -> C.Sink (Either Error v) m ()
+printDebug (Debug type' pretty) = impl where
 
   impl =
     let toJson :: (StdCon.MonadResource m, A.ToJSON v) => C.Sink (Either Error v) m A.Value
@@ -56,9 +58,14 @@ printAsJSON type' = impl where
           (Right _____, w) -> pure $ jobJSON  Nothing      w
           (Left except, w) -> pure $ jobJSON (Just except) w
 
+        config = A.defConfig { A.confIndent = A.Spaces 2, A.confNumFormat = A.Decimal }
+        encode j = if pretty
+          then A.encodePretty' config j
+          else A.encode j
+
      in do json <- toJson
            liftIO $ do
-             putStr (A.encode json)
+             putStr (encode json)
              putStr "\n"
 
   loop :: (StdCon.MonadResource m, A.ToJSON v) => E.ExceptT Error (W.WriterT [v] (C.Sink (Either Error v) m)) ()
@@ -72,5 +79,8 @@ printAsJSON type' = impl where
     let (status, optional) = case error' of
           Nothing      -> ("ok"    :: T.Text, [])
           Just error'' -> ("error" :: T.Text, ["error" .= error''])
-     in A.object (optional <> ["type" .= type', "status" .= status, "items" .= emitted])
+      in A.object (optional <>
+            [ "type" .= debugModeText type'
+            , "status" .= status
+            , "items" .= emitted])
 

@@ -3,6 +3,7 @@ module JoScript.Data.Config where
 
 import Prelude (Show)
 
+import Data.Bool (Bool)
 import Data.Maybe (Maybe)
 import Data.Text (Text)
 
@@ -12,13 +13,16 @@ data Job
   = JobBuild (Maybe DebugMode) [FilePath]
   deriving (Show)
 
-data DebugMode
+data DebugMode = Debug { mode :: DebugKind, pretty :: Bool }
+  deriving Show
+
+data DebugKind
   = DebugTextBlock
   | DebugTextLexer
   | DebugTextParse
   deriving (Show)
 
-debugModeText :: DebugMode -> Text
+debugModeText :: DebugKind -> Text
 debugModeText DebugTextBlock = "debug:block"
 debugModeText DebugTextLexer = "debug:lexer"
 debugModeText DebugTextParse = "debug:parse"

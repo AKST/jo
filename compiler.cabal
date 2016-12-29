@@ -43,6 +43,7 @@ library
                        transformers,
                        containers,
                        conduit,
+                       aeson-pretty,
                        ansi-wl-pprint,
                        template-haskell,
                        unordered-containers,

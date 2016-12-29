@@ -42,6 +42,8 @@ library
                        transformers,
                        containers,
                        conduit,
+                       ansi-wl-pprint,
+                       template-haskell,
                        unordered-containers,
                        optparse-applicative,
                        conduit-combinators

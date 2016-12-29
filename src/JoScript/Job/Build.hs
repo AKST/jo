@@ -18,7 +18,7 @@ import System.IO (IO, FilePath, print)
 import System.Exit (die)
 import System.Directory (doesFileExist)
 
-import JoScript.Data.Config (DebugMode(..))
+import JoScript.Data.Config (DebugMode(..), debugModeText)
 import JoScript.Text.BlockPass (runBlockPass)
 import JoScript.Util.Conduit (characterStream, printAsJSON)
 
@@ -28,7 +28,7 @@ build debug files = forM_ files (handler debug) where
   handler Nothing __    = pure ()
   handler (Just mode) f = C.runConduitRes (withFile mode) where
     withFile DebugTextBlock = withBlockPass f
-                           .| printAsJSON "debug/???"
+                           .| printAsJSON (debugModeText mode)
 
   withBlockPass file = characterStream file .| runBlockPass
 

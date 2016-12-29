@@ -3,7 +3,6 @@
 module JoScript.Config.ArgParsing (parseArgs, readJob) where
 
 import qualified Prelude as Std
-import Prelude (String, foldl)
 
 import Text.PrettyPrint.ANSI.Leijen (Doc)
 import qualified Text.PrettyPrint.ANSI.Leijen as Le

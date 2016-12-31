@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module JoScript.Pass.Block (runBlockPass) where
 
 
@@ -13,13 +14,16 @@ import Data.Ord
 import Data.Word (Word64)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
+import Data.Functor (Functor)
 import qualified Data.Text as T
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 
 import Control.Lens ((%=), (.=), use)
 import Control.Monad ((>>=), (>>), Monad, unless)
-import Control.Applicative (pure, (<*))
+import Control.Applicative (pure, (<*), Applicative)
+import Control.Monad.State.Class (MonadState)
+import Control.Monad.Error.Class (MonadError, throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Identity (Identity)
 import qualified Control.Monad.Trans.Except as E
@@ -65,11 +69,14 @@ branch' f (PS branch position m) = Std.fmap (\branch'' -> PS branch'' position m
 --------------------------------------------------------------
 
 type BlockConduit = ResultConduit Char BlockPass
-type BlockLexer m = E.ExceptT Error (S.StateT State (BlockConduit m))
+
+newtype BlockLexer m a
+  = BlockLexer { run :: E.ExceptT Error (S.StateT State (BlockConduit m)) a }
+  deriving (Functor, Applicative, Monad, MonadError Error, MonadState State)
 
 runBlockPass :: Monad m => BlockConduit m ()
 runBlockPass =
-  let s = E.runExceptT loop
+  let s = E.runExceptT (run loop)
    in S.evalStateT s initial >>= \case
       Right _____ -> pure ()
       Left except -> C.yield (Left except)
@@ -118,7 +125,7 @@ withBranch InLine = do
 
 withBranch (Dedent newIndent origin) = use memory' >>= \case
   -- when the previous indent was top level
-  [] | newIndent /= 0 -> E.throwE (known (IndentError ShallowDedent) origin)
+  [] | newIndent /= 0 -> throwError (known (IndentError ShallowDedent) origin)
      | newIndent == 0 -> branch' .= InLine
 
   -- when the previous indent was not top level
@@ -128,7 +135,7 @@ withBranch (Dedent newIndent origin) = use memory' >>= \case
       yieldElem (Bp BpDedent origin)
     else if newIndent == lastIndent
       then branch' .= InLine
-      else E.throwE (known (IndentError ShallowDedent) origin)
+      else throwError (known (IndentError ShallowDedent) origin)
 
 --------------------------------------------------------------
 --                        Util func                         --
@@ -140,7 +147,7 @@ yieldElem e = liftConduit (C.yield (Right e))
 consumeWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m (Word64, T.Text)
 consumeWhile predicate = iter 0 T.empty where
   iter n t = liftConduit C.await >>= \case
-    Just (Left except) -> E.throwE except
+    Just (Left except) -> throwError except
     Just (Right input) ->
       if predicate input then do
         position' %= Position.update input
@@ -164,7 +171,7 @@ currentIndent = use memory' >>= \case
 consumeNext :: Monad m => BlockLexer m ()
 consumeNext = liftConduit C.await >>= \case
   Nothing               -> pure ()
-  Just (Left exception) -> E.throwE exception
+  Just (Left exception) -> throwError exception
   Just (Right c)        -> position' %= Position.update c
 
 
@@ -174,5 +181,6 @@ consumeNext = liftConduit C.await >>= \case
 
 {- whenever the monad stack is modified we'll only need
  - to update the lifting of conduit function calls here -}
-liftConduit m = lift (lift m)
+liftConduit :: Monad m => BlockConduit m a -> BlockLexer m a
+liftConduit m = BlockLexer (lift (lift m))
 

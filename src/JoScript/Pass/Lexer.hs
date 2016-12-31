@@ -3,6 +3,7 @@
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module JoScript.Pass.Lexer (runLexerPass) where
 
 import Prelude (Bool, Int, otherwise, (.), (+), (-), (||), fromIntegral)
@@ -16,14 +17,17 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Text (Text)
 import Data.Word (Word64)
+import Data.Functor (Functor)
 import qualified Data.Foldable as F
 import qualified Data.Text as T
 import qualified Data.Conduit as C
 
 import Control.Lens ((%=), (.=), use)
 import Control.Monad ((>>=), (>>), Monad, unless)
-import Control.Applicative (pure, (<*))
+import Control.Applicative (pure, (<*), Applicative)
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.State.Class (MonadState)
+import Control.Monad.Error.Class (MonadError, throwError)
 import qualified Control.Monad.Trans.Except as E
 import qualified Control.Monad.Trans.State as S
 
@@ -74,11 +78,12 @@ position' f (S p) = Std.fmap (\p' -> S  p') (f p)
 --------------------------------------------------------------
 
 type LexerConduit = ResultConduit BlockPass LexerPass
-type Lexer m = E.ExceptT Error (S.StateT State (LexerConduit m))
+newtype Lexer m a = Lexer { run :: E.ExceptT Error (S.StateT State (LexerConduit m)) a }
+  deriving (Functor, Applicative, Monad, MonadError Error, MonadState State)
 
 runLexerPass :: Monad m => LexerConduit m ()
 runLexerPass =
-  let s = E.runExceptT (loop Read)
+  let s = E.runExceptT (run (loop Read))
       i = S { position = Position.init }
    in S.evalStateT s i >>= \case
       Right _____ -> pure ()
@@ -164,8 +169,8 @@ loop (ContToken payload i) = iter i where
         FailStep error -> do
           position <- use position'
           let taken = T.take (fromIntegral offset) line'
-          let shift = Position.moveOver taken position
-          E.throwE (known (LexerError error) shift)
+          position' %= Position.moveOver taken
+          throwFromPosition error
 
 
 --------------------------------------------------------------
@@ -234,13 +239,13 @@ isIdentiferCharacter = Std.not . isIdentiferTerminator
 throwFromPosition :: Monad m => LexerErrorT -> Lexer m ()
 throwFromPosition error' = do
   position <- use position'
-  E.throwE (known (LexerError error') position)
+  throwError (known (LexerError error') position)
 
 readUpdate :: Monad m => Lexer m (Position, BpRepr)
 readUpdate = liftConduit C.await >>= \case
   Nothing -> do
     position <- use position'
-    E.throwE (known (LexerError UnexpectedEnd) position)
+    throwError (known (LexerError UnexpectedEnd) position)
 
   Just (Right item) -> do
     let (Bp repr p) = item
@@ -249,7 +254,7 @@ readUpdate = liftConduit C.await >>= \case
       addNewline (BpLine line) = BpLine (T.snoc line '\n')
       addNewline otherResult   = otherResult
 
-  Just (Left except) -> E.throwE except
+  Just (Left except) -> throwError except
 
 readToken :: Monad m => Lexer m BpRepr
 readToken = readUpdate >>= \(_, t) -> pure t
@@ -269,5 +274,6 @@ yieldToken token = do
 
 {- whenever the monad stack is modified we'll only need
  - to update the lifting of conduit function calls here -}
-liftConduit m = lift (lift m)
+liftConduit :: Monad m => LexerConduit m a -> Lexer m a
+liftConduit m = Lexer (lift (lift m))
 

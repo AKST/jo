@@ -10,5 +10,5 @@ import Control.Applicative ((<*>), (<$>), pure)
 
 withObject :: [A.Pair] -> A.Value -> A.Value
 withObject updates (A.Object map) = A.Object newMap where
-  newMap = HM.union map (HM.fromList updates)
+  newMap = HM.union (HM.fromList updates) map
 

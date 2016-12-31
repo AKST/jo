@@ -5,16 +5,18 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module JoScript.Text.LexerPass (runLexerPass) where
 
-import Prelude (Bool, Int, otherwise, (.), (+), (-))
+import Prelude (Bool, Int, otherwise, (.), (+), (-), (||))
 import qualified Prelude as Std
 
 import Data.Eq ((==))
 import Data.Ord ((>=))
 import Data.Char (Char, isDigit)
+import qualified Data.Char as Char
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Text (Text)
 import Data.Word (Word64)
+import qualified Data.Foldable as F
 import qualified Data.Text as T
 import qualified Data.Conduit as C
 
@@ -111,7 +113,7 @@ loop (ReadMore payload offset) = readToken >>= \case
   BpDedent -> throwFromPosition (UnexpectedToken BpDedent)
   BpIndent -> throwFromPosition (UnexpectedToken BpIndent)
   BpLine l ->
-    let nl = T.append (T.snoc (line payload) '\n') l
+    let nl = T.append (line payload) l
      in loop (ContToken (payload { line = nl }) offset)
 
 -- This is branch that is called at the start of every token,
@@ -142,7 +144,7 @@ loop (StartToken line) = withLine line where
     withHead '#'  = continueToken lexComment
     withHead '"'  = continueToken lexString
     withHead c
-      | isIdentiferhead c = continueToken lexIdentifier
+      | isIdentiferHead c = continueToken lexIdentifier
       | isDigit c         = continueToken lexUInt
       | otherwise         = throwFromPosition (UnknownTokenStart c)
 
@@ -178,11 +180,16 @@ loop (ContToken payload i) = iter i where
 --                        lex trees                         --
 --------------------------------------------------------------
 
-lexWhitespace :: Text -> Int -> ItCont
-lexWhitespace = Std.undefined
-
 lexIdentifier :: Text -> Int -> ItCont
-lexIdentifier = Std.undefined
+lexIdentifier t i
+  | isIdentiferTerminator head = ItEmit i LpIdentifier
+  | isIdentiferCharacter  head = ItNext
+  where head = T.index t i
+
+lexWhitespace :: Text -> Int -> ItCont
+lexWhitespace t i
+  | ' ' <- T.index t i = ItNext
+  | otherwise          = ItEmit i (LpSpace . Std.fromIntegral . T.length)
 
 lexComment :: Text -> Int -> ItCont
 lexComment t i
@@ -191,7 +198,11 @@ lexComment t i
 
 
 lexString :: Text -> Int -> ItCont
-lexString = Std.undefined
+lexString t i
+  | '"' <- T.index t i = if i == 0
+      then ItNext
+      else ItEmit (i + 1) (LpString . T.drop 1)
+  | otherwise          = ItNext
 
 lexUInt :: Text -> Int -> ItCont
 lexUInt = Std.undefined
@@ -200,8 +211,17 @@ lexUInt = Std.undefined
 --                        Util func                         --
 --------------------------------------------------------------
 
-isIdentiferhead :: Char -> Bool
-isIdentiferhead c = Std.any (Std.== c) " :\t\n,.(){}[]|"
+isIdentiferTerminator :: Char -> Bool
+isIdentiferTerminator c = F.elem c " :\t\n,.(){}[]|"
+
+isIdentiferHead :: Char -> Bool
+isIdentiferHead ch = Std.not (isDigit || isTerminator || containsIllegal)
+  where containsIllegal = F.elem ch "#@"
+        isTerminator    = isIdentiferTerminator ch
+        isDigit         = Char.isDigit ch
+
+isIdentiferCharacter :: Char -> Bool
+isIdentiferCharacter = Std.not . isIdentiferTerminator
 
 throwFromPosition :: Monad m => LexerErrorT -> Lexer m ()
 throwFromPosition error' = do
@@ -217,7 +237,9 @@ readUpdate = liftConduit C.await >>= \case
   Just (Right item) -> do
     let (Bp repr p) = item
     sPosition .= p
-    pure (p, repr)
+    pure (p, addNewline repr) where
+      addNewline (BpLine line) = BpLine (T.snoc line '\n')
+      addNewline otherResult   = otherResult
 
   Just (Left except) -> E.throwE except
 

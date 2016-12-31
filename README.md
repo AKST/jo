@@ -2,9 +2,9 @@
 
 > A ML / LISP passing as Python
 
-JoLang JoScript (jojo/jo for short) is a general purpose language,
-with dope ass syntax. The intention is to write a language that
-both compiles to run on the web, and run natively.
+JoLang (jo for short) is a general purpose language, with dope ass syntax.
+The intention is to write a language that both compiles to run on the web,
+and run natively.
 
 [namesake]: https://www.youtube.com/watch?v=Xg5wISNSDvQ
 
@@ -18,17 +18,24 @@ I wanted to make a language, so made a language.
 
 - Types that aren't a pain in the ass...
 - Pleasurable to write, pleasurable to debug, pleasurable to read
-  - I love guns as much as the next guy, but if I'm blowing off my
-    foot I feel I ow everyone the courtesy things are about to get
-    a little messy, you feel me?
+  - A pleasant development feedback loop
+  - Tool friendly, with a compiler api
+  - This is partial subjective, like my preference for lisps hypen snake case
+    over camel case, or white space as a block delimiter.
+  - I love foot guns as much as the next guy, but if I'm about to blow off
+    my foot I'd like it to be super obvious.
+  - Shouldn't need to import `Debug.trace` to start debugging, or know the
+    exact line number in my repl.
 - High Expressive and Modular without insisting on the alignment of the stars
-  - I would prefer not to be overly redundant
-    and have to repeat myself over and over, when context and
-    intent is clear and unambigious.
-- Defaulting to explictity, but allowing implictity where reasonable
-  - Read this as I don't plan to go to town with syntaxtic sugar
-    but there are expections to everything and they should be well
-    justified.
+- Default to explictity, but allowing implictity when reasonable
+  - Super vague bullet point, but basically strict a good balanced between
+    implict and explict stuff, for example:
+      - type casting, always explict
+      - imported namespace, always explict
+      - imported type classes\*, maybe implict?
+
+> \* Note I'm not sure what mechanism I'll use for polymophism and
+> shared interfaces but I'll just say type classes though out.
 
 ### 🌚  Features 🌝
 
@@ -37,27 +44,40 @@ I wanted to make a language, so made a language.
 - Dope ass syntax
 - Pattern matching
 - Quansi quotes
-- Macros
+- Lisp Style Macros
+  - Preferably without paren soup syntax
+  - At the same time I'd like some level of typing
+  - Probably closer to Rusts macro system
 - Mostly Functional
-- Immutable by default
+  - Immutable by default
+  - Probably not purely functional
 - ML style modules
 
 #### Type Features
 
 The type system is completely optional, as in you can turn it off.
 
+> I think being able to turn off a type system might be good for
+> fast iteration, and an improved feedback loop for the developer.
+> But I don't want this to be at the expensive of the actual type
+> system, like you see in Groovy when you try to do actual types
+> there are some seriously awkward.
+
+- Higher kinded types
 - Optionals
 - Varient types
 - Record types
 - Immutable by default (like rust)
 - Global type inference
 
+> I'm not sure how ML style modules will mix with a system like type classes
+
 ### Current syntax
 
-I swear to god, I'm honestly suprised by the number of languages,
-libraries, tools, whatever don't show you examples of syntax. Lol,
-so since this language is currently in development this example may
-be out of date but I try to keep this up to date.
+I'm honestly suprised by the number of library/language projects that don't
+show you examples of syntax in the read me, so here is some syntax. Also since
+this language is currently in development this example maybe out of date but I
+try to keep this up to date (A commented version is in the `examples` folder).
 
 ```jojo
 .define 'akst.simple where: |out-factory|
@@ -115,11 +135,49 @@ be out of date but I try to keep this up to date.
 > this example could be out of date, there are more examples in the
 > examples directoryo of this project.
 
-## To build
+## Compiler API
 
-> TODO
+Right now the compiler barely even generates anything, it just reads the
+source, but you can inspect what it's doing by reading the debug output.
 
-## An Example
+```
+$ jo build MAIN_FILES
 
-> TODO
+# debugging the output for the various compilation passes, passes include
+#
+#   - text:lexer
+#   - text:block
+#   - text:parse
+#
+$ jo build -d COMPILER_PASS MAIN_FILES
+
+# pretty printed compiler output for the various compilation passes
+$ jo build -d COMPILER_PASS --pretty MAIN_FILES
+```
+
+> The thought process behind this is to have the subcommands like build,
+> repl, debug, etc, what ever makes sense. The debug output should be also
+> usable by tooling like an IDE or linter or whatever.
+
+## Dev Notes
+
+### To build
+
+```
+stack build
+```
+
+### Debugging & Development
+
+```
+stack ghci
+... makes changes
+ghci: :reload
+ghci: :main build -d text:lexer --pretty ../examples/simple.jo
+... *pretty printed debug output from the lexer*
+```
+
+I just use GHCI for debugging and development with running `:reload` on
+recompliation, and testing the compile output with the debug flag as
+shown above.
 

@@ -20,7 +20,7 @@ import qualified Control.Monad.Trans.Except as E
 import qualified Control.Monad.Trans.State as S
 
 import JoScript.Data.Error (Error)
-import JoScript.Data.Syntax (Syntax)
+import JoScript.Data.Syntax (SynModule)
 import JoScript.Data.Position (Position)
 import JoScript.Data.LexerPass (LexerPass(..), LpRepr(..), LpNumber(..))
 import qualified JoScript.Data.LexerPass as Lp
@@ -35,7 +35,7 @@ data State = S { position :: Position }
 --                      Entry point                         --
 --------------------------------------------------------------
 
-type ParserConduit = ResultConduit LexerPass Syntax
+type ParserConduit = ResultConduit LexerPass SynModule
 type Parser m = E.ExceptT Error (S.StateT State (ParserConduit m))
 
 runParsePass :: Monad m => ParserConduit m ()

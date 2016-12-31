@@ -7,7 +7,7 @@ module JoScript.Data.Position ( Position(..)
                               , moveOver
                               ) where
 
-import Prelude (Show, Char, (+))
+import Prelude (Show, Eq, Ord, Char, (+))
 
 import Control.Applicative ((<*>), (<$>))
 
@@ -20,7 +20,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 
 data Position = Position { line :: Word64, column :: Word64 }
-  deriving Show
+  deriving (Show, Eq, Ord)
 
 startIndex :: Word64
 startIndex = 1

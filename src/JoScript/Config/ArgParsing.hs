@@ -21,7 +21,7 @@ import Control.Applicative ((<$>), (<*>), pure, some, (<|>))
 import System.IO (IO)
 
 import JoScript.Util.Strings (multiline, toDocument)
-import JoScript.Data.Config (Job(..), DebugMode(..), DebugKind(..), versionStr)
+import JoScript.Data.Config (Job(..), DebugMode(..), DebugKind(..), versionStr, BuildConfig(..))
 
 readJob :: IO Job
 readJob = A.execParser parseArgs
@@ -39,7 +39,7 @@ parseArgs = A.info (A.subparser buildParser) meta where
       header  = A.header "Builds a list of supplied main files"
 
 parseBuildMode :: A.Parser Job
-parseBuildMode = JobBuild <$> debug <*> files where
+parseBuildMode = (\d f -> JobBuild (BuildC d f)) <$> debug <*> files where
   files = some (A.argument A.str meta) where
     meta = A.help ("A list of main files") <> A.metavar "MAINS"
 

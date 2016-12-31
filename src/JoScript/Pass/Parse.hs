@@ -26,7 +26,7 @@ import JoScript.Data.LexerPass (LexerPass(..), LpRepr(..), LpNumber(..))
 import qualified JoScript.Data.LexerPass as Lp
 import qualified JoScript.Data.Error as Error
 import qualified JoScript.Data.Position as Position
-import JoScript.Util.Conduit (ConduitE, ResultConduit)
+import JoScript.Util.Conduit (ConduitE, ResultSink, Result)
 
 data Branch = Init
 data State = S { position :: Position }
@@ -35,16 +35,15 @@ data State = S { position :: Position }
 --                      Entry point                         --
 --------------------------------------------------------------
 
-type ParserConduit = ResultConduit LexerPass SynModule
+type ParserConduit m = ResultSink LexerPass m
 type Parser m = E.ExceptT Error (S.StateT State (ParserConduit m))
 
-runParsePass :: Monad m => ParserConduit m ()
+runParsePass :: Monad m => ParserConduit m (Result SynModule)
 runParsePass =
   let s = E.runExceptT (loop Init)
       i = S { position = Position.init }
    in S.evalStateT s i >>= \case
-      Right _____ -> pure ()
-      Left except -> C.yield (Left except)
+      Left except -> pure (Left except)
 
 --------------------------------------------------------------
 --                      Event loop                          --

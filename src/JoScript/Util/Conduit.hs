@@ -1,10 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module JoScript.Util.Conduit ( characterStream
-                             , printDebug
+                             , printJsonCon
                              , ConduitE
                              , ResultConduit
+                             , ResultSink
+                             , Result
                              ) where
 
 import Prelude ((.), ($))
@@ -35,22 +38,25 @@ import qualified Data.Text.Lazy as LT
 import System.IO (FilePath)
 
 import JoScript.Data.Error (Error)
-import JoScript.Data.Config (DebugMode(..), debugModeText)
+import JoScript.Data.Config (DebugMode(..), debugModeText, FileBuildM)
 import qualified JoScript.Util.Json as Json
 import qualified JoScript.Util.Text as TUtil
 
 
-type ConduitE e i o = C.ConduitM (Either e i) (Either e o)
-type ResultConduit i o = ConduitE Error i o
+type ConduitE e i o m = C.ConduitM (Either e i) (Either e o) (FileBuildM m)
+
+type Result a            = Either Error a
+type ResultConduit i o m = C.ConduitM (Result i) (Result o) m
+type ResultSink i      m = C.ConduitM (Result i) Void m
 
 
-characterStream :: StdCon.MonadResource m => FilePath -> C.Source m (Either Error Std.Char)
+--characterStream :: StdCon.MonadResource m => FilePath -> C.Source m (Either Error Std.Char)
 characterStream f = mapOutput Right (StdCon.sourceFile f .| mapFoldable LT.unpack)
 
 type Tldr m v = (StdCon.MonadResource m, A.ToJSON v)
 
-printDebug :: (StdCon.MonadResource m, A.ToJSON v) => DebugMode -> C.Sink (Either Error v) m ()
-printDebug (Debug type' pretty) = impl where
+printJsonCon :: (StdCon.MonadResource m, A.ToJSON v) => DebugMode -> C.Sink (Either Error v) m ()
+printJsonCon (Debug type' pretty) = impl where
 
   impl =
     let toJson :: (StdCon.MonadResource m, A.ToJSON v) => C.Sink (Either Error v) m A.Value

@@ -77,8 +77,8 @@ position' f (S p) = Std.fmap (\p' -> S  p') (f p)
 --                      Entry point                         --
 --------------------------------------------------------------
 
-type LexerConduit = ResultConduit BlockPass LexerPass
-newtype Lexer m a = Lexer { run :: E.ExceptT Error (S.StateT State (LexerConduit m)) a }
+type LexerConduit m = ResultConduit BlockPass LexerPass m
+newtype Lexer m a   = Lexer { run :: E.ExceptT Error (S.StateT State (LexerConduit m)) a }
   deriving (Functor, Applicative, Monad, MonadError Error, MonadState State)
 
 runLexerPass :: Monad m => LexerConduit m ()

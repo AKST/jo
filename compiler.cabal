@@ -52,6 +52,7 @@ library
                        unordered-containers,
                        optparse-applicative,
                        conduit-combinators
+
   default-language:    Haskell2010
   Default-Extensions:  NoImplicitPrelude
 

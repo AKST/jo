@@ -68,7 +68,7 @@ branch' f (PS branch position m) = Std.fmap (\branch'' -> PS branch'' position m
 --                      Entry point                         --
 --------------------------------------------------------------
 
-type BlockConduit = ResultConduit Char BlockPass
+type BlockConduit m = ResultConduit Char BlockPass m
 
 newtype BlockLexer m a
   = BlockLexer { run :: E.ExceptT Error (S.StateT State (BlockConduit m)) a }

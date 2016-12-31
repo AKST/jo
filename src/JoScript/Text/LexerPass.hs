@@ -5,7 +5,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module JoScript.Text.LexerPass (runLexerPass) where
 
-import Prelude (Bool, Int, otherwise, (.), (+), (-), (||))
+import Prelude (Bool, Int, otherwise, (.), (+), (-), (||), fromIntegral)
 import qualified Prelude as Std
 
 import Data.Eq ((==))
@@ -34,17 +34,18 @@ import JoScript.Data.Error ( Error(..)
                            )
 import JoScript.Data.Position (Position)
 import JoScript.Data.BlockPass (BlockPass(..), BpRepr(..))
-import JoScript.Data.LexerPass (LexerPass(..), LpRepr(..))
+import JoScript.Data.LexerPass (LexerPass(..), LpRepr(..), LpNumber(..))
 import qualified JoScript.Data.BlockPass as Bp
 import qualified JoScript.Data.LexerPass as Lp
 import qualified JoScript.Data.Error as Error
 import qualified JoScript.Data.Position as Position
+import qualified JoScript.Util.Text as T
 import JoScript.Util.Conduit (ConduitE, ResultConduit)
 
 type ContCallback = Text -> Int -> ItCont
 
 data ItCont
-  = ItJump ContCallback
+  = ItJump Int ContCallback
   | ItFail Error.LexerErrorT
   | ItEmit Int (Text -> Lp.LpRepr)
   | ItNext
@@ -154,15 +155,15 @@ loop (ContToken payload i) = iter i where
   line' = (line payload)
 
   length :: Word64
-  length = Std.fromIntegral (T.length line')
+  length = fromIntegral (T.length line')
 
   iter :: Monad m => Word64 -> Lexer m ()
   iter offset
     | offset >= length = loop (ReadMore payload offset)
     | length == 0 = loop Read
-    | otherwise   = case lexer payload line' (Std.fromIntegral offset) of
+    | otherwise   = case lexer payload line' (fromIntegral offset) of
         ItNext       -> iter (offset + 1)
-        ItJump lexer -> loop (ContToken (payload { lexer }) offset)
+        ItJump i fn -> loop (ContToken (payload { lexer = fn }) (fromIntegral i))
         ItEmit i fn  -> do
           let taken  = T.take i line'
           let remain = T.drop i line'
@@ -171,7 +172,7 @@ loop (ContToken payload i) = iter i where
           loop (StartToken remain)
         ItFail error -> do
           position <- use sPosition
-          let taken = T.take (Std.fromIntegral offset) line'
+          let taken = T.take (fromIntegral offset) line'
           let shift = Position.moveOver taken position
           E.throwE (known (LexerError error) shift)
 
@@ -189,7 +190,7 @@ lexIdentifier t i
 lexWhitespace :: Text -> Int -> ItCont
 lexWhitespace t i
   | ' ' <- T.index t i = ItNext
-  | otherwise          = ItEmit i (LpSpace . Std.fromIntegral . T.length)
+  | otherwise          = ItEmit i (LpSpace . fromIntegral . T.length)
 
 lexComment :: Text -> Int -> ItCont
 lexComment t i
@@ -205,11 +206,27 @@ lexString t i
   | otherwise          = ItNext
 
 lexUInt :: Text -> Int -> ItCont
-lexUInt = Std.undefined
+lexUInt t i
+  | Char.isDigit head    = ItNext
+  | head == '.'          = ItJump (i + 1) lexUFloat
+  | isNumTerminator head = ItEmit i (LpNumberLit . LpInteger . T.readInt)
+  | otherwise            = ItFail (InvalidIntSuffix head)
+  where head = T.index t i
+
+lexUFloat :: Text -> Int -> ItCont
+lexUFloat t i
+  | Char.isDigit head    = ItNext
+  | isNumTerminator head = ItEmit i (LpNumberLit . LpFloat . T.readFloat)
+  | head == '.'          = ItFail DuplicateDecimial
+  | otherwise            = ItFail (InvalidIntSuffix head)
+  where head = T.index t i
 
 --------------------------------------------------------------
 --                        Util func                         --
 --------------------------------------------------------------
+
+isNumTerminator :: Char -> Bool
+isNumTerminator = isIdentiferTerminator
 
 isIdentiferTerminator :: Char -> Bool
 isIdentiferTerminator c = F.elem c " :\t\n,.(){}[]|"

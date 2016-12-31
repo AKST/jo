@@ -35,6 +35,8 @@ data LexerErrorT
   = UnexpectedEnd
   | UnexpectedToken Bp.BpRepr
   | UnknownTokenStart Char
+  | InvalidIntSuffix Char
+  | DuplicateDecimial
   deriving Show
 
 known k p = Error k (Known p)
@@ -47,6 +49,8 @@ lexerErrMsg :: LexerErrorT -> Text
 lexerErrMsg UnexpectedEnd         = "unexpected lexer ended"
 lexerErrMsg (UnexpectedToken _)   = "unexpected block token"
 lexerErrMsg (UnknownTokenStart _) = "unexpected character"
+lexerErrMsg (InvalidIntSuffix _)  = "integer was suffixed with invalid character"
+lexerErrMsg DuplicateDecimial     = "duplicated decimal place in float"
 
 instance A.ToJSON Error where
   toJSON (Error repr loc) = A.object [ "location" .= loc, "repr" .= repr]
@@ -65,4 +69,5 @@ instance A.ToJSON IndentErrorT where
 instance A.ToJSON LexerErrorT where
   toJSON e@(UnexpectedToken t)   = A.object ["message" .= lexerErrMsg e, "token" .= t]
   toJSON e@(UnknownTokenStart c) = A.object ["message" .= lexerErrMsg e, "character" .= c]
+  toJSON e@(InvalidIntSuffix c)  = A.object ["message" .= lexerErrMsg e, "character" .= c]
   toJSON e                       = A.object ["message" .= lexerErrMsg e]

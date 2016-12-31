@@ -16,7 +16,7 @@ data LexerPass = Lp { repr :: LpRepr, position :: Position }
   deriving Show
 
 data LpNumber
-  = LpInteger Int
+  = LpInteger Word64
   | LpFloat Float
   deriving Show
 

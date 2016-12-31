@@ -18,32 +18,60 @@ I wanted to make a language, so made a language.
 
 - Types that aren't a pain in the ass...
 - Pleasurable to write, pleasurable to debug, pleasurable to read
-  - A pleasant development feedback loop
-  - Tool friendly, with a compiler api
-  - This is partial subjective, like my preference for lisps hypen snake case
-    over camel case, or white space as a block delimiter.
+  - A pleasant development feedback loop, while remaining Tool friendly
+    - compiler has an API
+  - This is partial subjective
+    - style with lisp's hypen snake case, instead of camel case
+      - but lets do something retarded like outlaw the use of `_` or camelcase
+      - this is something that can be established through linters and standard library functions.
+    - use white space as a block delimiter
   - I love foot guns as much as the next guy, but if I'm about to blow off
     my foot I'd like it to be super obvious.
   - Shouldn't need to import `Debug.trace` to start debugging, or know the
     exact line number in my repl.
 - High Expressive and Modular without insisting on the alignment of the stars
-- Default to explictity, but allowing implictity when reasonable
-  - Super vague bullet point, but basically strict a good balanced between
-    implict and explict stuff, for example:
-      - type casting, always explict
-      - imported namespace, always explict
-      - imported type classes\*, maybe implict?
+  - declaritive syntax can be expressed in terms of imparitive
+    - how classes in javascript can be implemented by extending a prototype
+    - async/await in javascript can be expressed as a series of nested promises
+  - statements are expressions like coffeescript/rust/lisp 😄
+    - except assignment because that's unforgivable 😡
+  - overloadable syntax sugar
+    - user defined syntax constructs can have their own keywords like `return`,
+      `yield` that appear similar to language defined keywords, without having
+      a large dictionary of forbidden keywords
+        - See contextuals
+    - syntax should not discourage use of the correct approach
+      - like in vanilla haskell, it's much easier to use a linked list of
+        64 bit characters as a string verse `Data.String`, or a list of pairs
+        instead of `Data.Map` or `Data.HashMap`.
+      - Async IO doesn't need to be scary like it is in or eye sore
+        like callback soup javascript. Having something like async/await
+        from C# / Python / Javascript is very desirable
+    - list/set/map syntax sugar should be overloadable
+    - async await should be expressable in syntax used else where in the
+      language, without being to vague about it's indent... Kind of like
+      a monad but not scary?
+  - Default to explictity, but allowing implictity when reasonable
+    - Super vague bullet point, but basically strict a good balanced between
+      implict and explict stuff, for example:
+        - type casting, always explict
+        - imported namespace, always explict
+        - utilization of a type class when type being dispatched has single
+          implementation imported into the current namespace
+        - return statements? I'm not realy sure if I want to make this implict,
+          maybe in single line lambdas
 
 > \* Note I'm not sure what mechanism I'll use for polymophism and
 > shared interfaces but I'll just say type classes though out.
 
-### 🌚  Features 🌝
+### Feature wish list 🌝
 
 > Like most of these aren't implemented yet, so think of this as a todo list
 
 - Dope ass syntax
 - Pattern matching
 - Quansi quotes
+- multiline strings and string interpolation
 - Lisp Style Macros
   - Preferably without paren soup syntax
   - At the same time I'd like some level of typing
@@ -71,6 +99,41 @@ The type system is completely optional, as in you can turn it off.
 - Global type inference
 
 > I'm not sure how ML style modules will mix with a system like type classes
+
+### Actual features 🌚
+
+Think of this is a list of things that are partially implemented
+
+#### Contextuals
+
+Keywords like `return` are prefixed with a `.` like `.return`, which allows
+user define syntax constructs to have keywords that more naturally fit with
+their constructs. The type function or value of constucts **Contextuals**
+are determined on a case by case basis. Defining them is yet to be decided.
+
+```jo
+# a function has the contextuals .return
+double := | x |
+  .return [* x 2]
+
+gcd := | x y |
+  if [< x y] then:
+    .return gcd(x, y)
+
+  modded := % x y
+  if [== modded 0]
+    .return y
+  else
+    .return gcd(y, modded)
+```
+
+#### Lambdas
+
+> TODO
+
+#### Data Literals
+
+> TODO, but basically strings
 
 ### Current syntax
 

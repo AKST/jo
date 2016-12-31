@@ -3,7 +3,7 @@
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-module JoScript.Text.LexerPass (runLexerPass) where
+module JoScript.Pass.Lexer (runLexerPass) where
 
 import Prelude (Bool, Int, otherwise, (.), (+), (-), (||), fromIntegral)
 import qualified Prelude as Std

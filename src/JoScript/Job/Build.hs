@@ -20,9 +20,9 @@ import System.Exit (die)
 import System.Directory (doesFileExist)
 
 import JoScript.Data.Config (DebugMode(..), DebugKind(..), debugModeText)
-import JoScript.Text.BlockPass (runBlockPass)
-import JoScript.Text.LexerPass (runLexerPass)
-import JoScript.Text.ParsePass (runParsePass)
+import JoScript.Pass.Block (runBlockPass)
+import JoScript.Pass.Lexer (runLexerPass)
+import JoScript.Pass.Parse (runParsePass)
 import JoScript.Util.Conduit (characterStream, printDebug)
 
 build :: Maybe DebugMode -> [FilePath] -> IO ()

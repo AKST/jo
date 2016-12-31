@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
-module JoScript.Text.BlockPass (runBlockPass) where
+module JoScript.Pass.Block (runBlockPass) where
 
 
 import Prelude ((+), ($), flip, Char)

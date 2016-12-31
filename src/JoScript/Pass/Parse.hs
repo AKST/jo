@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-module JoScript.Text.ParsePass (runParsePass) where
+module JoScript.Pass.Parse (runParsePass) where
 
 import Prelude (otherwise, (.))
 import qualified Prelude as Std

@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     JoScript.Data.Position,
                        JoScript.Data.Error,
+                       JoScript.Data.Syntax,
                        JoScript.Data.BlockPass,
                        JoScript.Data.LexerPass,
                        JoScript.Data.Config,
@@ -27,11 +28,13 @@ library
                        JoScript.Job.Build,
 
                        JoScript.Util.Text,
+                       JoScript.Util.Strings,
                        JoScript.Util.Json,
                        JoScript.Util.Conduit,
 
-                       JoScript.Text.LexerPass,
-                       JoScript.Text.BlockPass
+                       JoScript.Pass.Lexer,
+                       JoScript.Pass.Parse,
+                       JoScript.Pass.Block
 
   build-depends:       base >= 4.7 && < 5,
                        mtl,

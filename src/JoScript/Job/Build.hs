@@ -22,6 +22,7 @@ import System.Directory (doesFileExist)
 import JoScript.Data.Config (DebugMode(..), DebugKind(..), debugModeText)
 import JoScript.Text.BlockPass (runBlockPass)
 import JoScript.Text.LexerPass (runLexerPass)
+import JoScript.Text.ParsePass (runParsePass)
 import JoScript.Util.Conduit (characterStream, printDebug)
 
 build :: Maybe DebugMode -> [FilePath] -> IO ()
@@ -31,9 +32,11 @@ build debug files = forM_ files (handler debug) where
   handler (Just m@(Debug mode _)) f = C.runConduitRes (withFile mode) where
     withFile DebugTextBlock = withBlockPass f .| printDebug m
     withFile DebugTextLexer = withLexerPass f .| printDebug m
+    withFile DebugTextParse = withParsePass f .| printDebug m
 
-  withBlockPass file = characterStream file .| runBlockPass
-  withLexerPass file = withBlockPass file   .| runLexerPass
+    withBlockPass file = characterStream file .| runBlockPass
+    withLexerPass file = withBlockPass file   .| runLexerPass
+    withParsePass file = withLexerPass file   .| runParsePass
 
 checkFilesExist :: [FilePath] -> IO ()
 checkFilesExist files = result where

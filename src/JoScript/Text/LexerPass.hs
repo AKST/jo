@@ -42,16 +42,16 @@ import qualified JoScript.Data.Position as Position
 import qualified JoScript.Util.Text as T
 import JoScript.Util.Conduit (ConduitE, ResultConduit)
 
-type ContCallback = Text -> Int -> ItCont
+type TokenBranchCallback = Text -> Int -> TokenBranchStep
 
-data ItCont
-  = ItJump Int ContCallback
-  | ItFail Error.LexerErrorT
-  | ItEmit Int (Text -> Lp.LpRepr)
-  | ItNext
+data TokenBranchStep
+  = JumpStep Int TokenBranchCallback
+  | FailStep Error.LexerErrorT
+  | EmitStep Int (Text -> Lp.LpRepr)
+  | NextStep
 
 data Payload = P { line  :: Text
-                 , lexer :: ContCallback
+                 , lexer :: TokenBranchCallback
                  }
 
 data Branch
@@ -66,17 +66,8 @@ data State = S { position :: Position }
 --                          Lens                            --
 --------------------------------------------------------------
 
--- line' :: Std.Functor f => (Text -> f Text) -> Payload -> f Payload
--- line' f (P ln lx) = Std.fmap (\ln' -> P ln' lx) (f ln)
-
---position' :: Std.Functor f => (Position -> f Position) -> Payload -> f Payload
---position' f (P ln p lx) = Std.fmap (\p' -> P ln p' lx) (f p)
-
--- lexer' :: Std.Functor f => (ContCallback -> f ContCallback) -> Payload -> f Payload
--- lexer' f (P ln lx) = Std.fmap (\lx' -> P ln lx') (f lx)
-
-sPosition :: Std.Functor f => (Position -> f Position) -> State -> f State
-sPosition f (S p) = Std.fmap (\p' -> S  p') (f p)
+position' :: Std.Functor f => (Position -> f Position) -> State -> f State
+position' f (S p) = Std.fmap (\p' -> S  p') (f p)
 
 --------------------------------------------------------------
 --                      Entry point                         --
@@ -128,7 +119,7 @@ loop (StartToken line) = withLine line where
 
     emit token = do
       yieldToken token
-      sPosition %= Position.update head
+      position' %= Position.update head
       loop (StartToken tail)
 
     withHead '\n' = emit LpNewline
@@ -162,16 +153,16 @@ loop (ContToken payload i) = iter i where
     | offset >= length = loop (ReadMore payload offset)
     | length == 0 = loop Read
     | otherwise   = case lexer payload line' (fromIntegral offset) of
-        ItNext       -> iter (offset + 1)
-        ItJump i fn -> loop (ContToken (payload { lexer = fn }) (fromIntegral i))
-        ItEmit i fn  -> do
+        NextStep       -> iter (offset + 1)
+        JumpStep i fn -> loop (ContToken (payload { lexer = fn }) (fromIntegral i))
+        EmitStep i fn  -> do
           let taken  = T.take i line'
           let remain = T.drop i line'
           yieldToken (fn taken)
-          sPosition %= Position.moveOver taken
+          position' %= Position.moveOver taken
           loop (StartToken remain)
-        ItFail error -> do
-          position <- use sPosition
+        FailStep error -> do
+          position <- use position'
           let taken = T.take (fromIntegral offset) line'
           let shift = Position.moveOver taken position
           E.throwE (known (LexerError error) shift)
@@ -181,44 +172,44 @@ loop (ContToken payload i) = iter i where
 --                        lex trees                         --
 --------------------------------------------------------------
 
-lexIdentifier :: Text -> Int -> ItCont
+lexIdentifier :: Text -> Int -> TokenBranchStep
 lexIdentifier t i
-  | isIdentiferTerminator head = ItEmit i LpIdentifier
-  | isIdentiferCharacter  head = ItNext
+  | isIdentiferTerminator head = EmitStep i LpIdentifier
+  | isIdentiferCharacter  head = NextStep
   where head = T.index t i
 
-lexWhitespace :: Text -> Int -> ItCont
+lexWhitespace :: Text -> Int -> TokenBranchStep
 lexWhitespace t i
-  | ' ' <- T.index t i = ItNext
-  | otherwise          = ItEmit i (LpSpace . fromIntegral . T.length)
+  | ' ' <- T.index t i = NextStep
+  | otherwise          = EmitStep i (LpSpace . fromIntegral . T.length)
 
-lexComment :: Text -> Int -> ItCont
+lexComment :: Text -> Int -> TokenBranchStep
 lexComment t i
-  | '\n' <- T.index t i = ItEmit i (LpComment . T.drop 1)
-  | char <- T.index t i = ItNext
+  | '\n' <- T.index t i = EmitStep i (LpComment . T.drop 1)
+  | char <- T.index t i = NextStep
 
 
-lexString :: Text -> Int -> ItCont
+lexString :: Text -> Int -> TokenBranchStep
 lexString t i
   | '"' <- T.index t i = if i == 0
-      then ItNext
-      else ItEmit (i + 1) (LpString . T.drop 1)
-  | otherwise          = ItNext
+      then NextStep
+      else EmitStep (i + 1) (LpString . T.drop 1)
+  | otherwise          = NextStep
 
-lexUInt :: Text -> Int -> ItCont
+lexUInt :: Text -> Int -> TokenBranchStep
 lexUInt t i
-  | Char.isDigit head    = ItNext
-  | head == '.'          = ItJump (i + 1) lexUFloat
-  | isNumTerminator head = ItEmit i (LpNumberLit . LpInteger . T.readInt)
-  | otherwise            = ItFail (InvalidIntSuffix head)
+  | Char.isDigit head    = NextStep
+  | head == '.'          = JumpStep (i + 1) lexUFloat
+  | isNumTerminator head = EmitStep i (LpNumberLit . LpInteger . T.readInt)
+  | otherwise            = FailStep (InvalidIntSuffix head)
   where head = T.index t i
 
-lexUFloat :: Text -> Int -> ItCont
+lexUFloat :: Text -> Int -> TokenBranchStep
 lexUFloat t i
-  | Char.isDigit head    = ItNext
-  | isNumTerminator head = ItEmit i (LpNumberLit . LpFloat . T.readFloat)
-  | head == '.'          = ItFail DuplicateDecimial
-  | otherwise            = ItFail (InvalidIntSuffix head)
+  | Char.isDigit head    = NextStep
+  | isNumTerminator head = EmitStep i (LpNumberLit . LpFloat . T.readFloat)
+  | head == '.'          = FailStep DuplicateDecimial
+  | otherwise            = FailStep (InvalidIntSuffix head)
   where head = T.index t i
 
 --------------------------------------------------------------
@@ -242,18 +233,18 @@ isIdentiferCharacter = Std.not . isIdentiferTerminator
 
 throwFromPosition :: Monad m => LexerErrorT -> Lexer m ()
 throwFromPosition error' = do
-  position <- use sPosition
+  position <- use position'
   E.throwE (known (LexerError error') position)
 
 readUpdate :: Monad m => Lexer m (Position, BpRepr)
 readUpdate = liftConduit C.await >>= \case
   Nothing -> do
-    position <- use sPosition
+    position <- use position'
     E.throwE (known (LexerError UnexpectedEnd) position)
 
   Just (Right item) -> do
     let (Bp repr p) = item
-    sPosition .= p
+    position' .= p
     pure (p, addNewline repr) where
       addNewline (BpLine line) = BpLine (T.snoc line '\n')
       addNewline otherResult   = otherResult
@@ -268,7 +259,7 @@ yieldElem p r = liftConduit (C.yield (Right (Lp r p)))
 
 yieldToken :: Monad m => LpRepr -> Lexer m ()
 yieldToken token = do
-  position <- use sPosition
+  position <- use position'
   yieldElem position token
 
 

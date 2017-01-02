@@ -9,23 +9,16 @@
  --}
 module JoScript.Data.Syntax where
 
-import Prelude (Show, Int, Float)
+import Protolude
 
-import Data.Eq (Eq)
-import JoScript.Data.Position (Position)
-import Data.Map (Map)
-import Data.Word (Word64)
-import Data.Text (Text)
-import Data.Maybe (Maybe(..))
 import Data.Aeson ((.=), (.:))
-import Data.Sequence (Seq)
 import qualified Data.Map as M
 import qualified Data.Sequence as S
 import qualified Data.Aeson as A
 
 import JoScript.Util.Json (withObject)
+import JoScript.Data.Position (Position)
 
-import System.IO (FilePath)
 
 type SynStringLitT = Text
 

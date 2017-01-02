@@ -1,13 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
-module JoScript.Data.LexerPass where
+module JoScript.Data.Lexer where
 
 import Protolude
 
-import JoScript.Data.Position (Position)
-import Data.Word (Word64)
 import Data.Aeson ((.=), (.:))
-import JoScript.Util.Json (withObject)
 import qualified Data.Aeson as A
+
+import JoScript.Util.Json (withObject)
+import JoScript.Data.Position (Position)
+
 
 
 data LexerPass = Lp { repr :: LpRepr, position :: Position }

@@ -1,23 +1,19 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 module JoScript.Util.Strings (trim, multiline, toDocument) where
 
-import Prelude ((.), (+), otherwise, Bool(..))
-import qualified Prelude as Std
+import Prelude (fail)
+import Protolude hiding ((<>))
+
+import Data.Monoid ((<>))
+import Data.String (fromString)
+import qualified Data.Text as T
+
+import Control.Lens (over, set)
 
 import Text.PrettyPrint.ANSI.Leijen (Doc)
 import qualified Text.PrettyPrint.ANSI.Leijen as L
-
-import Data.Eq
-import Data.Word (Word64)
-import Data.Monoid ((<>))
-import Data.Functor (fmap, Functor)
-import Data.Text (Text)
-import qualified Data.Text as T
-import Data.String (String)
-import qualified Data.String as String
-
-import Control.Lens (over, set)
 
 import Language.Haskell.TH.Quote (QuasiQuoter)
 import qualified Language.Haskell.TH.Quote as Quote
@@ -31,9 +27,9 @@ data TrimS
   | TrailingNewlines Word64
 
 
-trim :: String -> String
-trim = withState Init T.empty where
-  withState :: TrimS -> Text -> String -> String
+trim :: [Char] -> [Char]
+trim = withState Init "" where
+  withState :: TrimS -> Text -> [Char] -> [Char]
   withState ____ ys []     = T.unpack ys
 
   withState Init ys xs = case xs of
@@ -54,7 +50,7 @@ trim = withState Init T.empty where
   withState (Newline a 0) ys xss@('\n':xs) = withState (TrailingNewlines a) ys xss
   withState (Newline a b) ys xss@(x:xs)
     | a == b    = withState (AfterIndent a) ys xss
-    | x /= ' '  = Std.fail "invalid indent in line"
+    | x /= ' '  = fail "invalid indent in line"
     | otherwise = withState (Newline a (b + 1)) ys xs
 
   withState (TrailingNewlines a) ys xs = case xs of
@@ -67,7 +63,7 @@ data DocS = D { dBranch :: DocBranch, dOut :: Doc }
 data DocBranch = AnyD | Word Text
 
 {-- # transforms a string into a document --}
-toDocument :: String -> Doc
+toDocument :: [Char] -> Doc
 toDocument input = impl (D AnyD L.empty) input where
 
   out :: Functor f => (Doc -> f Doc) -> DocS -> f DocS
@@ -86,7 +82,7 @@ toDocument input = impl (D AnyD L.empty) input where
 
   text = L.text . T.unpack
 
-  impl :: DocS -> String -> Doc
+  impl :: DocS -> [Char] -> Doc
   impl acc@(dBranch -> AnyD) xs = case xs of
     '\n':xs -> impl (insert L.hardline acc) xs
     ' ' :xs -> impl (insert L.softline acc) xs
@@ -105,7 +101,7 @@ multiline = Quote.QuasiQuoter
   , Quote.quotePat  = invalid
   , Quote.quoteType = invalid
   , Quote.quoteDec  = invalid }
-  where withExp a = [|String.fromString a|]
+  where withExp a = [|fromString a|]
 
-        invalid _ = Std.fail "Illeagl QuasiQuote for multiline string"
+        invalid _ = fail "Illeagl QuasiQuote for multiline string"
 

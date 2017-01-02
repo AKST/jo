@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module JoScript.Data.BlockPass where
+module JoScript.Data.Block where
 
 import Protolude
 

@@ -1,37 +1,17 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 module JoScript.Pass.Block (runBlockPass) where
 
 
-import Prelude ((+), ($), flip, Char)
-import qualified Prelude as Std
+import Protolude hiding (State)
 
-import Data.Eq
-import Data.Ord
-import Data.Word (Word64)
-import Data.Maybe (Maybe(..))
-import Data.Either (Either(..))
-import Data.Functor (Functor)
-import qualified Data.Text as T
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 
-import Control.Lens ((%=), (.=), use)
-import Control.Monad ((>>=), (>>), Monad, unless)
-import Control.Applicative (pure, (<*), Applicative)
-import Control.Monad.State.Class (MonadState)
-import Control.Monad.Error.Class (MonadError, throwError)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Identity (Identity)
-import qualified Control.Monad.Trans.Except as E
-import qualified Control.Monad.Trans.State as S
+import Control.Lens ((%=), (.=), use, snoc)
 
-import JoScript.Data.Error ( Error(..)
-                           , Repr(IndentError)
-                           , IndentErrorT(..)
-                           , known
-                           )
 import JoScript.Util.Conduit (ConduitE, ResultConduit)
-import JoScript.Data.BlockPass hiding (position)
+import JoScript.Data.Error (Error(..), Repr(IndentError), IndentErrorT(..), known)
+import JoScript.Data.Block hiding (position)
 import JoScript.Data.Position (Position(..))
 import qualified JoScript.Data.Position as Position
 
@@ -39,26 +19,26 @@ data Branch
   = Dedent Word64 Position
   | Preline
   | InLine
-  deriving Std.Show
+  deriving Show
 
 data State = PS { branch :: Branch
                 , position :: Position
                 , indentMemory :: [Word64]
                 }
-  deriving Std.Show
+  deriving Show
 
 --------------------------------------------------------------
 --                          Lens                            --
 --------------------------------------------------------------
 
-position' :: Std.Functor f => (Position -> f Position) -> State -> f State
-position' f (PS branch position m) = Std.fmap (\position'' -> PS branch position'' m) (f position)
+position' :: Functor f => (Position -> f Position) -> State -> f State
+position' f (PS branch position m) = fmap (\position'' -> PS branch position'' m) (f position)
 
-memory' :: Std.Functor f => ([Word64] -> f [Word64]) -> State -> f State
-memory' f (PS branch position m) = Std.fmap (\m'' -> PS branch position m'') (f m)
+memory' :: Functor f => ([Word64] -> f [Word64]) -> State -> f State
+memory' f (PS branch position m) = fmap (\m'' -> PS branch position m'') (f m)
 
-branch' :: Std.Functor f => (Branch -> f Branch) -> State -> f State
-branch' f (PS branch position m) = Std.fmap (\branch'' -> PS branch'' position m) (f branch)
+branch' :: Functor f => (Branch -> f Branch) -> State -> f State
+branch' f (PS branch position m) = fmap (\branch'' -> PS branch'' position m) (f branch)
 
 --------------------------------------------------------------
 --                      Entry point                         --
@@ -67,13 +47,13 @@ branch' f (PS branch position m) = Std.fmap (\branch'' -> PS branch'' position m
 type BlockConduit m = ResultConduit Char BlockPass m
 
 newtype BlockLexer m a
-  = BlockLexer { run :: E.ExceptT Error (S.StateT State (BlockConduit m)) a }
+  = BlockLexer { run :: ExceptT Error (StateT State (BlockConduit m)) a }
   deriving (Functor, Applicative, Monad, MonadError Error, MonadState State)
 
 runBlockPass :: Monad m => BlockConduit m ()
 runBlockPass =
-  let s = E.runExceptT (run loop)
-   in S.evalStateT s initial >>= \case
+  let s = runExceptT (run loop)
+   in evalStateT s initial >>= \case
       Right _____ -> pure ()
       Left except -> C.yield (Left except)
 
@@ -140,24 +120,24 @@ withBranch (Dedent newIndent origin) = use memory' >>= \case
 yieldElem :: Monad m => BlockPass -> BlockLexer m ()
 yieldElem e = liftConduit (C.yield (Right e))
 
-consumeWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m (Word64, T.Text)
-consumeWhile predicate = iter 0 T.empty where
+consumeWhile :: Monad m => (Char -> Bool) -> BlockLexer m (Word64, Text)
+consumeWhile predicate = iter 0 mempty where
   iter n t = liftConduit C.await >>= \case
     Just (Left except) -> throwError except
     Just (Right input) ->
       if predicate input then do
         position' %= Position.update input
-        iter (n + 1) (T.snoc t input)
+        iter (n + 1) (snoc t input)
       else do
         liftConduit (C.leftover (Right input))
         pure (n, t)
     Nothing -> pure (n, t)
 
-countWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m Word64
-countWhile f = Std.fmap Std.fst (consumeWhile f)
+countWhile :: Monad m => (Char -> Bool) -> BlockLexer m Word64
+countWhile f = fmap fst (consumeWhile f)
 
-readWhile :: Monad m => (Std.Char -> Std.Bool) -> BlockLexer m T.Text
-readWhile f = Std.fmap Std.snd (consumeWhile f)
+readWhile :: Monad m => (Char -> Bool) -> BlockLexer m Text
+readWhile f = fmap snd (consumeWhile f)
 
 currentIndent :: Monad m => BlockLexer m Word64
 currentIndent = use memory' >>= \case

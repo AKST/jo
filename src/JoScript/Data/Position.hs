@@ -5,17 +5,11 @@ module JoScript.Data.Position ( Position(..)
                               , moveOver
                               ) where
 
-import Prelude (Show, Eq, Ord, Char, (+))
+import Protolude hiding (uncons)
 
-import Control.Applicative ((<*>), (<$>))
-
-import qualified Data.Aeson as A
-import Data.Maybe(Maybe(..))
+import Data.Text (uncons)
 import Data.Aeson ((.=), (.:))
-import Data.Monoid ((<>), mempty)
-import Data.Word (Word64)
-import Data.Text (Text)
-import qualified Data.Text as T
+import qualified Data.Aeson as A
 
 data Position = Position { line :: Word64, column :: Word64 }
   deriving (Show, Eq, Ord)
@@ -37,8 +31,8 @@ update '\n' = onNewline
 update _ = moveRight
 
 moveOver :: Text -> Position -> Position
-moveOver (T.uncons -> Nothing)     p = p
-moveOver (T.uncons -> Just (h, t)) p = update h p
+moveOver (uncons -> Nothing)     p = p
+moveOver (uncons -> Just (h, t)) p = update h p
 
 instance A.ToJSON Position where
   toJSON (Position line column) =
@@ -52,17 +46,4 @@ instance A.FromJSON Position where
     Position <$> o .: "line"
              <*> o .: "column"
   parseJSON _ = mempty
-
-
-
--- class PositionShifts t where
---   shiftWith :: a -> Position -> Position
---
--- instance PositionShifts Text where
---   shiftWith text pos = iter 0 pos where
---     tlen = T.length text
---     iter i (Position line column)
---       | i >= length = Position line column
---       | otherwise =
-
 

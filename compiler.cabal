@@ -19,14 +19,15 @@ library
                      , JoScript.Util.Strings
                      , JoScript.Util.Json
                      , JoScript.Util.Conduit
-                     , JoScript.Util.Debug
+
 
 
   exposed-modules:     JoScript.Data.Position
+                     , JoScript.Util.Debug
                      , JoScript.Data.Error
                      , JoScript.Data.Syntax
-                     , JoScript.Data.BlockPass
-                     , JoScript.Data.LexerPass
+                     , JoScript.Data.Block
+                     , JoScript.Data.Lexer
                      , JoScript.Data.Config
 
                      , JoScript.Config.ArgParsing
@@ -74,7 +75,7 @@ executable client
   hs-source-dirs:      client
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base, compiler
+  build-depends:       base, compiler, protolude
   default-language:    Haskell2010
   Default-Extensions:  NoImplicitPrelude
 
@@ -89,6 +90,7 @@ test-suite compiler-test
                      , compiler
                      , HUnit
                      , aeson
+                     , protolude
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
   Default-Extensions:  NoImplicitPrelude

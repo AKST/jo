@@ -1,21 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module JoScript.Data.Config where
 
-import Prelude (Show, id)
+import Protolude hiding (get)
 
-import Data.Bool (Bool)
-import Data.Maybe (Maybe)
-import Data.Text (Text)
-import Data.Functor (Functor, fmap)
-
-import Control.Monad (Monad)
-import Control.Applicative (Applicative, pure)
 import Control.Monad.Trans (MonadTrans)
-import Control.Monad.Reader (MonadReader)
-import Control.Monad.IO.Class (MonadIO)
-import qualified Control.Monad.Reader as R
-
-import System.IO (IO (), FilePath)
 
 data BuildConfig = BuildC { debug :: Maybe DebugMode, files :: [FilePath] }
   deriving (Show)
@@ -35,17 +23,17 @@ data DebugKind
   | DebugTextParse
   deriving (Show)
 
-newtype FileBuildM m a = FileBuildM { get :: R.ReaderT FileBuildConfig m a }
+newtype FileBuildM m a = FileBuildM { get :: ReaderT FileBuildConfig m a }
   deriving
     ( Functor
     , Applicative
     , Monad
-    , R.MonadReader FileBuildConfig
+    , MonadReader FileBuildConfig
     , MonadTrans
     , MonadIO
     )
 
-runFileBuildM r m = R.runReaderT r (get m)
+runFileBuildM r m = runReaderT r (get m)
 
 --------------------------------------------------------------
 --                          Lens                            --

@@ -1,9 +1,9 @@
 module JoScript.Job (runJob) where
 
-import System.IO (IO)
+import Protolude
 
 import JoScript.Job.Build (buildFiles)
-import JoScript.Data.Config
+import JoScript.Data.Config (Job(..))
 
 runJob :: Job -> IO ()
 runJob (JobBuild config) = buildFiles config

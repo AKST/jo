@@ -1,40 +1,19 @@
 module JoScript.Pass.Lexer (runLexerPass) where
 
-import Prelude (Bool, Int, otherwise, (.), (+), (-), (||), fromIntegral)
-import qualified Prelude as Std
+import Protolude hiding (State)
+import Data.Char (isDigit)
 
-import Data.Eq ((==))
-import Data.Ord ((>=))
-import Data.Char (Char, isDigit)
-import qualified Data.Char as Char
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
-import Data.Text (Text)
-import Data.Word (Word64)
-import Data.Functor (Functor)
-import qualified Data.Foldable as F
 import qualified Data.Text as T
 import qualified Data.Conduit as C
 
 import Control.Lens ((%=), (.=), use)
-import Control.Monad ((>>=), (>>), Monad, unless)
-import Control.Applicative (pure, (<*), Applicative)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.State.Class (MonadState)
-import Control.Monad.Error.Class (MonadError, throwError)
-import qualified Control.Monad.Trans.Except as E
-import qualified Control.Monad.Trans.State as S
 
-import JoScript.Data.Error ( Error(..)
-                           , Repr(LexerError)
-                           , LexerErrorT(..)
-                           , known
-                           )
+import JoScript.Data.Error (Error(..), Repr(LexerError), LexerErrorT(..), known)
 import JoScript.Data.Position (Position)
-import JoScript.Data.BlockPass (BlockPass(..), BpRepr(..))
-import JoScript.Data.LexerPass (LexerPass(..), LpRepr(..), LpNumber(..))
-import qualified JoScript.Data.BlockPass as Bp
-import qualified JoScript.Data.LexerPass as Lp
+import JoScript.Data.Block (BlockPass(..), BpRepr(..))
+import JoScript.Data.Lexer (LexerPass(..), LpRepr(..), LpNumber(..))
+import qualified JoScript.Data.Block as Bp
+import qualified JoScript.Data.Lexer as Lp
 import qualified JoScript.Data.Error as Error
 import qualified JoScript.Data.Position as Position
 import qualified JoScript.Util.Text as T
@@ -64,22 +43,22 @@ data State = S { position :: Position }
 --                          Lens                            --
 --------------------------------------------------------------
 
-position' :: Std.Functor f => (Position -> f Position) -> State -> f State
-position' f (S p) = Std.fmap (\p' -> S  p') (f p)
+position' :: Functor f => (Position -> f Position) -> State -> f State
+position' f (S p) = fmap (\p' -> S  p') (f p)
 
 --------------------------------------------------------------
 --                      Entry point                         --
 --------------------------------------------------------------
 
 type LexerConduit m = ResultConduit BlockPass LexerPass m
-newtype Lexer m a   = Lexer { run :: E.ExceptT Error (S.StateT State (LexerConduit m)) a }
+newtype Lexer m a   = Lexer { run :: ExceptT Error (StateT State (LexerConduit m)) a }
   deriving (Functor, Applicative, Monad, MonadError Error, MonadState State)
 
 runLexerPass :: Monad m => LexerConduit m ()
 runLexerPass =
-  let s = E.runExceptT (run (loop Read))
+  let s = runExceptT (run (loop Read))
       i = S { position = Position.init }
-   in S.evalStateT s i >>= \case
+   in evalStateT s i >>= \case
       Right _____ -> pure ()
       Left except -> C.yield (Left except)
 
@@ -197,7 +176,7 @@ lexString t i
 
 lexUInt :: Text -> Int -> TokenBranchStep
 lexUInt t i
-  | Char.isDigit head    = NextStep
+  | isDigit head         = NextStep
   | head == '.'          = JumpStep (i + 1) lexUFloat
   | isNumTerminator head = EmitStep i (LpNumberLit . LpInteger . T.readInt)
   | otherwise            = FailStep (InvalidIntSuffix head)
@@ -205,7 +184,7 @@ lexUInt t i
 
 lexUFloat :: Text -> Int -> TokenBranchStep
 lexUFloat t i
-  | Char.isDigit head    = NextStep
+  | isDigit head         = NextStep
   | isNumTerminator head = EmitStep i (LpNumberLit . LpFloat . T.readFloat)
   | head == '.'          = FailStep DuplicateDecimial
   | otherwise            = FailStep (InvalidIntSuffix head)
@@ -219,16 +198,16 @@ isNumTerminator :: Char -> Bool
 isNumTerminator = isIdentiferTerminator
 
 isIdentiferTerminator :: Char -> Bool
-isIdentiferTerminator c = F.elem c " :\t\n,.(){}[]|"
+isIdentiferTerminator c = elem c " :\t\n,.(){}[]|"
 
 isIdentiferHead :: Char -> Bool
-isIdentiferHead ch = Std.not (isDigit || isTerminator || containsIllegal)
-  where containsIllegal = F.elem ch "#@"
+isIdentiferHead ch = not (isDigit' || isTerminator || containsIllegal)
+  where containsIllegal = elem ch "#@"
         isTerminator    = isIdentiferTerminator ch
-        isDigit         = Char.isDigit ch
+        isDigit'        = isDigit ch
 
 isIdentiferCharacter :: Char -> Bool
-isIdentiferCharacter = Std.not . isIdentiferTerminator
+isIdentiferCharacter = not . isIdentiferTerminator
 
 throwFromPosition :: Monad m => LexerErrorT -> Lexer m ()
 throwFromPosition error' = do

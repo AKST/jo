@@ -1,7 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module JoScript.Config.ArgParsing (parseArgs, readJob) where
 
-import qualified Prelude as Std
+import Protolude hiding ((<>))
 
 import Text.PrettyPrint.ANSI.Leijen (Doc)
 import qualified Text.PrettyPrint.ANSI.Leijen as Le
@@ -10,14 +10,7 @@ import qualified Options.Applicative.Types as A
 import qualified Options.Applicative.Extra as A
 import qualified Options.Applicative.Builder as A
 
-import Data.Bool (Bool(..))
-import Data.Maybe (Maybe(..))
-import Data.Monoid (mempty, (<>))
-
-import Control.Monad ((>>=))
-import Control.Applicative ((<$>), (<*>), pure, some, (<|>))
-
-import System.IO (IO)
+import Data.Monoid ((<>))
 
 import JoScript.Util.Strings (multiline, toDocument)
 import JoScript.Data.Config (Job(..), DebugMode(..), DebugKind(..), versionStr, BuildConfig(..))

@@ -1,8 +1,6 @@
 module Main where
 
-import Control.Monad ((>>=))
-
-import System.IO (IO, print)
+import Protolude
 
 import JoScript.Config.ArgParsing (readJob)
 import JoScript.Job (runJob)

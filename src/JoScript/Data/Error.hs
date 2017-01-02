@@ -8,7 +8,7 @@ import qualified Data.Aeson.Types as A
 import qualified Data.Aeson as A
 
 import JoScript.Data.Position (Position)
-import JoScript.Data.BlockPass as Bp
+import JoScript.Data.Block as Bp
 import JoScript.Util.Json (withObject)
 
 data Error = Error Repr Location
@@ -34,6 +34,10 @@ data LexerErrorT
   | DuplicateDecimial
   deriving (Eq, Show)
 
+--------------------------------------------------------------
+--                          exports                         --
+--------------------------------------------------------------
+
 known k p = Error k (Known p)
 
 reprDescription :: Repr -> Text
@@ -46,6 +50,10 @@ lexerErrMsg (UnexpectedToken _)   = "unexpected block token"
 lexerErrMsg (UnknownTokenStart _) = "unexpected character"
 lexerErrMsg (InvalidIntSuffix _)  = "integer was suffixed with invalid character"
 lexerErrMsg DuplicateDecimial     = "duplicated decimal place in float"
+
+--------------------------------------------------------------
+--                         instances                        --
+--------------------------------------------------------------
 
 instance A.ToJSON Error where
   toJSON (Error repr loc) = A.object [ "location" .= loc, "repr" .= repr]

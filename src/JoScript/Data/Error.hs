@@ -1,35 +1,30 @@
 {-# LANGUAGE OverloadedStrings #-}
 module JoScript.Data.Error where
 
-import Prelude (Show, Char)
+import Protolude hiding (Location)
 
-import JoScript.Data.Position (Position)
-
-import Control.Monad ((>>=))
-import Control.Applicative ((<*>), (<$>), pure)
+import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson.Types as A
 import qualified Data.Aeson as A
-import Data.Aeson ((.=), (.:))
-import Data.Monoid ((<>), mempty)
-import Data.Text (Text)
 
+import JoScript.Data.Position (Position)
 import JoScript.Data.BlockPass as Bp
 import JoScript.Util.Json (withObject)
 
 data Error = Error Repr Location
-  deriving Show
+  deriving (Eq, Show)
 
 data Location = Known Position
-  deriving Show
+  deriving (Eq, Show)
 
 data Repr
   = IndentError IndentErrorT
   | LexerError LexerErrorT
-  deriving Show
+  deriving (Eq, Show)
 
 data IndentErrorT
   = ShallowDedent
-  deriving Show
+  deriving (Eq, Show)
 
 data LexerErrorT
   = UnexpectedEnd
@@ -37,7 +32,7 @@ data LexerErrorT
   | UnknownTokenStart Char
   | InvalidIntSuffix Char
   | DuplicateDecimial
-  deriving Show
+  deriving (Eq, Show)
 
 known k p = Error k (Known p)
 

@@ -45,6 +45,7 @@ library
                        text,
                        directory,
                        bytestring,
+                       protolude,
                        transformers,
                        containers,
                        conduit,

@@ -1,23 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 module JoScript.Data.LexerPass where
 
-import Prelude (Show, Int, Float)
+import Protolude
 
 import JoScript.Data.Position (Position)
-import Data.Word
-import Data.Text (Text)
+import Data.Word (Word64)
 import Data.Aeson ((.=), (.:))
 import JoScript.Util.Json (withObject)
 import qualified Data.Aeson as A
 
 
 data LexerPass = Lp { repr :: LpRepr, position :: Position }
-  deriving Show
+  deriving (Eq, Show)
 
 data LpNumber
   = LpInteger Word64
   | LpFloat Float
-  deriving Show
+  deriving (Eq, Show)
 
 data LpRepr
   = LpEnd
@@ -38,7 +37,7 @@ data LpRepr
   | LpNumberLit LpNumber
   | LpString Text
   | LpComment Text
-  deriving Show
+  deriving (Eq, Show)
 
 toToken :: LpRepr -> Position -> LexerPass
 toToken k p = Lp k p

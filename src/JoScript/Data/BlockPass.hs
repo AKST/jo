@@ -1,27 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 module JoScript.Data.BlockPass where
 
-import Prelude (Show)
+import Protolude
+
+import Data.Aeson ((.=), (.:))
+import qualified Data.Aeson.Types as A
+import qualified Data.Aeson as A
 
 import JoScript.Data.Position (Position)
 
-import Control.Monad ((>>=))
-import Control.Applicative ((<*>), (<$>), pure)
-import qualified Data.Aeson.Types as A
-import qualified Data.Aeson as A
-import Data.Aeson ((.=), (.:))
-import Data.Monoid ((<>), mempty)
-import Data.Text (Text)
 
 data BlockPass = Bp { repr :: BpRepr, position :: Position }
-  deriving Show
+  deriving (Eq, Show)
 
 data BpRepr
   = BpLine Text
   | BpIndent
   | BpDedent
   | BpEnd
-  deriving Show
+  deriving (Eq, Show)
 
 instance A.ToJSON BlockPass where
   toJSON Bp{..} = A.object ["position" .= position, "repr" .= repr]

@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 module JoScript.Config.ArgParsing (parseArgs, readJob) where
 

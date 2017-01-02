@@ -1,7 +1,5 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PartialTypeSignatures #-}
 module JoScript.Util.Conduit ( characterStream
                              , printJsonCon
                              , ConduitE
@@ -39,6 +37,7 @@ import System.IO (FilePath)
 
 import JoScript.Data.Error (Error)
 import JoScript.Data.Config (DebugMode(..), debugModeText, FileBuildM)
+import qualified JoScript.Util.Debug as Debug
 import qualified JoScript.Util.Json as Json
 import qualified JoScript.Util.Text as TUtil
 

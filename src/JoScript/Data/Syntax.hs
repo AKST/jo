@@ -1,9 +1,5 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DuplicateRecordFields #-}
 {-- # This data structure is more about
  --
  -- About representing the 1:1 representation of the source

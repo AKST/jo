@@ -1,9 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module JoScript.Pass.Lexer (runLexerPass) where
 
 import Prelude (Bool, Int, otherwise, (.), (+), (-), (||), fromIntegral)

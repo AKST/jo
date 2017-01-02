@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DuplicateRecordFields #-}
 module JoScript.Pass.Parse (runParsePass) where
 
 import Prelude (otherwise, (.))

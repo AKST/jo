@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module JoScript.Util.Text (foldlM, readFloat, readInt) where
 
 import Prelude ((.))

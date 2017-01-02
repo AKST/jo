@@ -3,9 +3,8 @@ module JoScript.Data.Error where
 
 import Protolude hiding (Location)
 
-import Data.Aeson ((.=), (.:))
+import Data.Aeson ((.=))
 import qualified Data.Aeson.Types as A
-import qualified Data.Aeson as A
 
 import JoScript.Data.Position (Position)
 import JoScript.Data.Block as Bp
@@ -30,6 +29,7 @@ data IndentErrorT
 data LexerErrorT
   = LUnexpectedEnd
   | LUnexpectedToken Bp.BpRepr
+  | LUnexpectedCharacter Char
   | LUnknownTokenStart Char
   | LInvalidIntSuffix Char
   | LDuplicateDecimial
@@ -43,18 +43,24 @@ data ParseErrorT
 --                          exports                         --
 --------------------------------------------------------------
 
+known :: Repr -> Position -> Error
 known k p = Error k (Known p)
 
 reprDescription :: Repr -> Text
 reprDescription (IndentError _) = "text:block"
 reprDescription (LexerError _) = "text:lexer"
+reprDescription (ParseError _) = "text:parse"
 
 lexerErrMsg :: LexerErrorT -> Text
-lexerErrMsg LUnexpectedEnd         = "unexpected lexer ended"
-lexerErrMsg (LUnexpectedToken _)   = "unexpected block token"
-lexerErrMsg (LUnknownTokenStart _) = "unexpected character"
-lexerErrMsg (LInvalidIntSuffix _)  = "integer was suffixed with invalid character"
-lexerErrMsg LDuplicateDecimial     = "duplicated decimal place in float"
+lexerErrMsg LUnexpectedEnd           = "unexpected lexer ended"
+lexerErrMsg (LUnexpectedToken _)     = "unexpected block token"
+lexerErrMsg (LUnexpectedCharacter _) = "unexpected character"
+lexerErrMsg (LUnknownTokenStart _)   = "unexpected character"
+lexerErrMsg (LInvalidIntSuffix _)    = "integer was suffixed with invalid character"
+lexerErrMsg LDuplicateDecimial       = "duplicated decimal place in float"
+
+parseErrMsg :: ParseErrorT -> Text
+parseErrMsg PUnexpectedEnd = "unexpected parse end during parse"
 
 --------------------------------------------------------------
 --                         instances                        --
@@ -64,18 +70,26 @@ instance A.ToJSON Error where
   toJSON (Error repr loc) = A.object [ "location" .= loc, "repr" .= repr]
 
 instance A.ToJSON Location where
-  toJSON (Known p) = withObject ["type" .= known] (A.toJSON p) where
-    known = "known" :: Text
+  toJSON (Known p) = withObject ["type" .= knownS] (A.toJSON p) where
+    knownS = "known" :: Text
 
 instance A.ToJSON Repr where
-  toJSON t@(IndentError err) = withObject ["type" .= reprDescription t] (A.toJSON err)
-  toJSON t@(LexerError  err) = withObject ["type" .= reprDescription t] (A.toJSON err)
+  toJSON t = withObject ["type" .= reprDescription t] (withType t) where
+    withType (IndentError err) = A.toJSON err
+    withType (LexerError  err) = A.toJSON err
+    withType (ParseError  err) = A.toJSON err
 
 instance A.ToJSON IndentErrorT where
   toJSON ShallowDedent = A.object ["message" .= ("dedent depth is too shallow" :: Text)]
 
 instance A.ToJSON LexerErrorT where
-  toJSON e@(LUnexpectedToken t)   = A.object ["message" .= lexerErrMsg e, "token" .= t]
-  toJSON e@(LUnknownTokenStart c) = A.object ["message" .= lexerErrMsg e, "character" .= c]
-  toJSON e@(LInvalidIntSuffix c)  = A.object ["message" .= lexerErrMsg e, "character" .= c]
-  toJSON e                       = A.object ["message" .= lexerErrMsg e]
+  toJSON t = withObject ["type" .= lexerErrMsg t] (withType t) where
+    withType (LUnexpectedToken token) = A.object ["token" .= token]
+    withType (LUnknownTokenStart c)   = A.object ["character" .= c]
+    withType (LUnexpectedCharacter c) = A.object ["character" .= c]
+    withType (LInvalidIntSuffix c)    = A.object ["character" .= c]
+    withType _                        = A.object []
+
+instance A.ToJSON ParseErrorT where
+  toJSON e = A.object ["message" .= parseErrMsg e]
+

@@ -3,7 +3,7 @@ module JoScript.Data.Lexer where
 
 import Protolude
 
-import Data.Aeson ((.=), (.:))
+import Data.Aeson ((.=))
 import qualified Data.Aeson as A
 
 import JoScript.Util.Json (withObject)
@@ -59,6 +59,7 @@ kindName (LpString _) = "string"
 kindName (LpComment _) = "comment"
 kindName LpRestOperator = "rest"
 kindName LpDotOperator = "."
+kindName LpDecoratorPrefix = "decorator"
 kindName (LpIdentifier _) = "identifier"
 kindName (LpNumberLit (LpInteger _)) = "number:integer"
 kindName (LpNumberLit (LpFloat   _)) = "number:float"

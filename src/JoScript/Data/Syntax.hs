@@ -11,9 +11,8 @@ module JoScript.Data.Syntax where
 
 import Protolude
 
-import Data.Aeson ((.=), (.:))
+import Data.Aeson ((.=))
 import qualified Data.Map as M
-import qualified Data.Sequence as S
 import qualified Data.Aeson as A
 
 import JoScript.Util.Json (withObject)
@@ -163,7 +162,7 @@ instance A.ToJSON SynExprRepr where
     forKind (SynDecorator d t)        = ["decorator" .= d, "target" .= t]
     forKind (SynReference r)          = ["reference" .= r]
     forKind (SynQuote quoted)         = ["quoted" .= quoted]
-    forKind (SynInvokation expr args) = ["invoked" .= expr, "arguments" .= args]
+    forKind (SynInvokation func args) = ["invoked" .= func, "arguments" .= args]
     forKind (SynDeclaration r value)  = ["reference" .= r, "value" .= value]
     forKind (SynBlock def statements) = ["arguments" .= def, "statements" .= statements]
     forKind (SynNumLit (SynIntLit i)) = ["integer" .= i]

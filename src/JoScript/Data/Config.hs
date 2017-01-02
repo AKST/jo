@@ -33,18 +33,23 @@ newtype FileBuildM m a = FileBuildM { get :: ReaderT FileBuildConfig m a }
     , MonadIO
     )
 
-runFileBuildM r m = runReaderT r (get m)
+runFileBuildM :: FileBuildConfig -> FileBuildM m a -> m a
+runFileBuildM r m = runReaderT (get m) r
 
 --------------------------------------------------------------
 --                          Lens                            --
 --------------------------------------------------------------
 
+debug' :: Functor f => (Maybe DebugMode -> f (Maybe DebugMode)) -> BuildConfig -> f BuildConfig
 debug' fn (BuildC d f) = fmap (\d' -> BuildC d' f) (fn d)
 
+files' :: Functor f => ([FilePath] -> f [FilePath]) -> BuildConfig -> f BuildConfig
 files' fn (BuildC d f) = fmap (\f' -> BuildC d f') (fn f)
 
+build' :: Functor f => (BuildConfig -> f BuildConfig) -> FileBuildConfig -> f FileBuildConfig
 build' fn (FileBC f b) = fmap (\b' -> FileBC f b') (fn b)
 
+filename' :: Functor f => (FilePath -> f FilePath) -> FileBuildConfig -> f FileBuildConfig
 filename' fn (FileBC f b) = fmap (\f' -> FileBC f' b) (fn f)
 
 --------------------------------------------------------------

@@ -5,30 +5,26 @@ import Protolude
 
 import Data.Conduit ((.|))
 import qualified Data.Conduit as C
-import qualified Data.Aeson as A
 
-import System.Directory (doesFileExist)
-
-import JoScript.Data.Config (DebugMode(..), DebugKind(..), debugModeText, FileBuildM(..))
-import JoScript.Data.Syntax (SynModule)
+import JoScript.Data.Config (DebugMode(..), DebugKind(..))
 import JoScript.Pass.Block (runBlockPass)
 import JoScript.Pass.Lexer (runLexerPass)
 import JoScript.Pass.Parse (runParsePass)
-import JoScript.Util.Conduit (characterStream, printJsonCon, Result)
+import JoScript.Util.Conduit (characterStream)
 import JoScript.Util.Debug (consumeBlockPass, consumeLexerPass, consumeSyntax, printPass)
 import qualified JoScript.Data.Config as Con
 
 buildFiles :: Con.BuildConfig -> IO ()
-buildFiles b@(Con.BuildC debug files) = impl where
+buildFiles (Con.BuildC debug files) = impl where
 
   impl = do
     forM_ files (handler debug)
 
-  handler Nothing                 f = pure ()
-  handler (Just m@(Debug mode p)) f = pass mode >>= printPass p where
-      pass DebugTextBlock = C.runConduitRes (withBlockPass .| consumeBlockPass f)
-      pass DebugTextLexer = C.runConduitRes (withLexerPass .| consumeLexerPass f)
-      pass DebugTextParse = C.runConduitRes withParsePass >>= consumeSyntax f
+  handler Nothing               _ = pure ()
+  handler (Just (Debug mode p)) f = debugPass mode >>= printPass p where
+      debugPass DebugTextBlock = C.runConduitRes (withBlockPass .| consumeBlockPass f)
+      debugPass DebugTextLexer = C.runConduitRes (withLexerPass .| consumeLexerPass f)
+      debugPass DebugTextParse = C.runConduitRes withParsePass >>= consumeSyntax f
 
       withBlockPass = characterStream f .| runBlockPass
       withLexerPass = withBlockPass .| runLexerPass

@@ -9,9 +9,9 @@ import qualified Data.Conduit.Combinators as C
 
 import Control.Lens ((%=), (.=), use, snoc)
 
-import JoScript.Util.Conduit (ConduitE, ResultConduit)
+import JoScript.Util.Conduit (ResultConduit)
 import JoScript.Data.Error (Error(..), Repr(IndentError), IndentErrorT(..), known)
-import JoScript.Data.Block hiding (position)
+import JoScript.Data.Block
 import JoScript.Data.Position (Position(..))
 import qualified JoScript.Data.Position as Position
 
@@ -69,8 +69,8 @@ initial = PS { branch = Preline
 
 loop :: Monad m => BlockLexer m ()
 loop = do
-  empty <- liftConduit C.null
-  if empty then do
+  isEmpty <- liftConduit C.null
+  if isEmpty then do
     position <- use position'
     yieldElem (Bp BpEnd position)
   else do
@@ -80,29 +80,29 @@ loop = do
 
 withBranch :: Monad m => Branch -> BlockLexer m ()
 withBranch Preline = do
-  initial <- use position'
-  indent  <- countWhile ((==) ' ')
-  current <- currentIndent
+  startPos <- use position'
+  indent   <- countWhile ((==) ' ')
+  current  <- currentIndent
   if indent == current then do
     branch' .= InLine
   else if indent > current then do
     branch' .= InLine
     memory' %= ((:) indent)
-    yieldElem (Bp BpIndent initial)
+    yieldElem (Bp BpIndent startPos)
   else do
-    branch' .= (Dedent indent initial)
+    branch' .= (Dedent indent startPos)
 
 withBranch InLine = do
-  initial  <- use position'
+  startPos  <- use position'
   consumed <- readWhile ((/=) '\n') <* consumeNext
   branch'  .= Preline
   unless (consumed == "") $
-    yieldElem (Bp (BpLine consumed) initial)
+    yieldElem (Bp (BpLine consumed) startPos)
 
 withBranch (Dedent newIndent origin) = use memory' >>= \case
   -- when the previous indent was top level
   [] | newIndent /= 0 -> throwError (known (IndentError ShallowDedent) origin)
-     | newIndent == 0 -> branch' .= InLine
+     | otherwise      -> branch' .= InLine
 
   -- when the previous indent was not top level
   lastIndent : others ->

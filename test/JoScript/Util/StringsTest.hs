@@ -20,3 +20,8 @@ trimWithDoubleNL = TestCase $ do
   let expected = "abc \n\ndef"
   let resulted = trim "\n  abc\n\n  def"
   assertEqual "skips indent" expected resulted
+
+testWithStateEmpty = TestCase $ do
+  let expected = "abc \n\n"
+  let resulted = trim "\n  abc\n\n  "
+  assertEqual "test impossible state" expected resulted

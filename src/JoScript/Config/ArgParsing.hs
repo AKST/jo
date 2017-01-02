@@ -13,7 +13,7 @@ import qualified Options.Applicative.Builder as A
 import Data.Monoid ((<>))
 
 import JoScript.Util.Strings (multiline, toDocument)
-import JoScript.Data.Config (Job(..), DebugMode(..), DebugKind(..), versionStr, BuildConfig(..))
+import JoScript.Data.Config (Job(..), DebugMode(..), DebugKind(..), BuildConfig(..))
 
 readJob :: IO Job
 readJob = A.execParser parseArgs
@@ -41,12 +41,12 @@ parseBuildMode = (\d f -> JobBuild (BuildC d f)) <$> debug <*> files where
   pretty = A.flag False True meta where
     meta = A.long "pretty"
 
-  debugMode = A.option reader meta where
+  debugMode = A.option modeReader meta where
 
-    reader = A.str >>= \case
-      "text:block"        -> pure (DebugTextBlock)
-      "text:lexer"        -> pure (DebugTextLexer)
-      "text:parse"        -> pure (DebugTextParse)
+    modeReader = A.str >>= \case
+      "text:block" -> pure (DebugTextBlock)
+      "text:lexer" -> pure (DebugTextLexer)
+      "text:parse" -> pure (DebugTextParse)
       ____________ -> A.readerError "invalid debug mode"
 
     meta = A.short 'd' <> A.long "debug" <> help <> var where

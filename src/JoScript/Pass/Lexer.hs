@@ -12,12 +12,11 @@ import JoScript.Data.Error (Error(..), Repr(LexerError), LexerErrorT(..), known)
 import JoScript.Data.Position (Position)
 import JoScript.Data.Block (BlockPass(..), BpRepr(..))
 import JoScript.Data.Lexer (LexerPass(..), LpRepr(..), LpNumber(..))
-import qualified JoScript.Data.Block as Bp
 import qualified JoScript.Data.Lexer as Lp
 import qualified JoScript.Data.Error as Error
 import qualified JoScript.Data.Position as Position
 import qualified JoScript.Util.Text as T
-import JoScript.Util.Conduit (ConduitE, ResultConduit)
+import JoScript.Util.Conduit (ResultConduit)
 
 type TokenBranchCallback = Text -> Int -> TokenBranchStep
 
@@ -89,16 +88,16 @@ loop (ReadMore payload offset) = readToken >>= \case
 -- This is branch that is called at the start of every token,
 -- as well was spawning error messages on any illegal tokens.
 loop (StartToken line) = withLine line where
-  withLine (T.uncons -> Nothing) = loop Read
-  withLine (T.uncons -> Just (head, tail)) = withHead head where
+
+  withLine (T.uncons -> Just (h, t)) = withHead h where
 
     continueToken lexer = loop (ContToken payload 0)
       where payload = P { line, lexer }
 
     emit token = do
       yieldToken token
-      position' %= Position.update head
-      loop (StartToken tail)
+      position' %= Position.update h
+      loop (StartToken t)
 
     withHead '\n' = emit LpNewline
     withHead '\'' = emit LpQuote
@@ -118,19 +117,21 @@ loop (StartToken line) = withLine line where
       | isDigit c         = continueToken lexUInt
       | otherwise         = throwFromPosition (LUnknownTokenStart c)
 
+  withLine _ = loop Read
+
 -- traverse over non trival multicharacter tokens
-loop (ContToken payload i) = iter i where
+loop (ContToken payload startIndex) = iter startIndex where
   line' :: Text
   line' = (line payload)
 
-  length :: Word64
-  length = fromIntegral (T.length line')
+  length' :: Word64
+  length' = fromIntegral (T.length line')
 
   iter :: Monad m => Word64 -> Lexer m ()
   iter offset
-    | offset >= length = loop (ReadMore payload offset)
-    | length == 0 = loop Read
-    | otherwise   = case lexer payload line' (fromIntegral offset) of
+    | length' == 0 = loop Read
+    | offset >= length' = loop (ReadMore payload offset)
+    | otherwise = case lexer payload line' (fromIntegral offset) of
         NextStep       -> iter (offset + 1)
         JumpStep i fn -> loop (ContToken (payload { lexer = fn }) (fromIntegral i))
         EmitStep i fn  -> do
@@ -139,11 +140,10 @@ loop (ContToken payload i) = iter i where
           yieldToken (fn taken)
           position' %= Position.moveOver taken
           loop (StartToken remain)
-        FailStep error -> do
-          position <- use position'
+        FailStep err -> do
           let taken = T.take (fromIntegral offset) line'
           position' %= Position.moveOver taken
-          throwFromPosition error
+          throwFromPosition err
 
 
 --------------------------------------------------------------
@@ -152,9 +152,10 @@ loop (ContToken payload i) = iter i where
 
 lexIdentifier :: Text -> Int -> TokenBranchStep
 lexIdentifier t i
-  | isIdentiferTerminator head = EmitStep i LpIdentifier
-  | isIdentiferCharacter  head = NextStep
-  where head = T.index t i
+  | isIdentiferTerminator h = EmitStep i LpIdentifier
+  | isIdentiferCharacter  h = NextStep
+  | otherwise               = FailStep (LUnexpectedCharacter h)
+  where h = T.index t i
 
 lexWhitespace :: Text -> Int -> TokenBranchStep
 lexWhitespace t i
@@ -164,7 +165,7 @@ lexWhitespace t i
 lexComment :: Text -> Int -> TokenBranchStep
 lexComment t i
   | '\n' <- T.index t i = EmitStep i (LpComment . T.drop 1)
-  | char <- T.index t i = NextStep
+  | ____ <- T.index t i = NextStep
 
 
 lexString :: Text -> Int -> TokenBranchStep
@@ -176,19 +177,19 @@ lexString t i
 
 lexUInt :: Text -> Int -> TokenBranchStep
 lexUInt t i
-  | isDigit head         = NextStep
-  | head == '.'          = JumpStep (i + 1) lexUFloat
-  | isNumTerminator head = EmitStep i (LpNumberLit . LpInteger . T.readInt)
-  | otherwise            = FailStep (LInvalidIntSuffix head)
-  where head = T.index t i
+  | isDigit h         = NextStep
+  | h == '.'          = JumpStep (i + 1) lexUFloat
+  | isNumTerminator h = EmitStep i (LpNumberLit . LpInteger . T.readInt)
+  | otherwise         = FailStep (LInvalidIntSuffix h)
+  where h = T.index t i
 
 lexUFloat :: Text -> Int -> TokenBranchStep
 lexUFloat t i
-  | isDigit head         = NextStep
-  | isNumTerminator head = EmitStep i (LpNumberLit . LpFloat . T.readFloat)
-  | head == '.'          = FailStep LDuplicateDecimial
-  | otherwise            = FailStep (LInvalidIntSuffix head)
-  where head = T.index t i
+  | isDigit h         = NextStep
+  | isNumTerminator h = EmitStep i (LpNumberLit . LpFloat . T.readFloat)
+  | h == '.'          = FailStep LDuplicateDecimial
+  | otherwise         = FailStep (LInvalidIntSuffix h)
+  where h = T.index t i
 
 --------------------------------------------------------------
 --                        Util func                         --

@@ -31,8 +31,8 @@ update '\n' = onNewline
 update _ = moveRight
 
 moveOver :: Text -> Position -> Position
-moveOver (uncons -> Nothing)     p = p
-moveOver (uncons -> Just (h, t)) p = update h p
+moveOver (uncons -> Just (h, t)) p = moveOver t (update h p)
+moveOver _                       p = p
 
 instance A.ToJSON Position where
   toJSON (Position line column) =

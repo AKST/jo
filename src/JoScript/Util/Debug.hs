@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module JoScript.Util.Debug
-  ( PassOut(..)
-  , PassDebug(..)
+  ( PassDebug(..)
+  , FileDebug(..)
   , mode
   , printPass
   , consumeSyntax
@@ -9,7 +9,7 @@ module JoScript.Util.Debug
   , consumeLexerPass
 ) where
 
-import Protolude hiding (ByteString)
+import Protolude hiding (ByteString, error)
 
 import Control.Monad.Trans.Writer (WriterT, tell, runWriterT)
 
@@ -27,13 +27,13 @@ import JoScript.Data.Syntax (SynModule)
 import JoScript.Data.Config (DebugKind(..), debugModeText)
 import JoScript.Util.Conduit (Result)
 
-data PassOut
-  = POutLexer (Seq LexerPass)
-  | POutBlock (Seq BlockPass)
-  | POutSyntax (Maybe SynModule)
+data PassDebug
+  = PDebugLexer (Seq LexerPass)
+  | PDebugBlock (Seq BlockPass)
+  | PDebugSyntax (Maybe SynModule)
   deriving (Eq, Show)
 
-data PassDebug = PassDebug { file :: FilePath, output :: PassOut, error :: Maybe Error }
+data FileDebug = FileDebug { file :: FilePath, output :: PassDebug, error :: Maybe Error }
   deriving (Eq, Show)
 
 --------------------------------------------------------------
@@ -42,10 +42,10 @@ data PassDebug = PassDebug { file :: FilePath, output :: PassOut, error :: Maybe
 
 type Impl m v a = ExceptT Error (WriterT (Seq v) (C.Sink (Result v) m)) a
 
-consumePass' :: Monad m => (Seq a -> PassOut) -> FilePath -> C.Sink (Result a) m PassDebug
+consumePass' :: Monad m => (Seq a -> PassDebug) -> FilePath -> C.Sink (Result a) m FileDebug
 consumePass' fn filename = runImpl impl where
   runImpl i = runWriterT (runExceptT i) >>= \(error, written) ->
-    pure (PassDebug filename (fn written) (leftToMaybe error))
+    pure (FileDebug filename (fn written) (leftToMaybe error))
 
   await :: Monad m => Impl m a (Maybe (Result a))
   await = lift (lift C.await)
@@ -62,20 +62,20 @@ consumePass' fn filename = runImpl impl where
     Just (Left  e) -> throw e
     Just (Right i) -> record i >> impl
 
-consumeBlockPass :: Monad m => FilePath -> C.Sink (Result BlockPass) m PassDebug
-consumeBlockPass = consumePass' POutBlock
+consumeBlockPass :: Monad m => FilePath -> C.Sink (Result BlockPass) m FileDebug
+consumeBlockPass = consumePass' PDebugBlock
 
-consumeLexerPass :: Monad m => FilePath -> C.Sink (Result LexerPass) m PassDebug
-consumeLexerPass = consumePass' POutLexer
+consumeLexerPass :: Monad m => FilePath -> C.Sink (Result LexerPass) m FileDebug
+consumeLexerPass = consumePass' PDebugLexer
 
-consumeSyntax :: Monad m => FilePath -> Result SynModule -> m PassDebug
-consumeSyntax file result = pure (PassDebug { file, error, output }) where
+consumeSyntax :: Monad m => FilePath -> Result SynModule -> m FileDebug
+consumeSyntax file result = pure (FileDebug { file, error, output }) where
   error  = leftToMaybe result
-  output = POutSyntax (rightToMaybe result)
+  output = PDebugSyntax (rightToMaybe result)
 
-printPass :: MonadIO m => Bool -> PassDebug -> m ()
-printPass pretty pass = putStrLn (encode pass) where
-  encode :: PassDebug -> ByteString
+printPass :: MonadIO m => Bool -> FileDebug -> m ()
+printPass pretty filedebug = putStrLn (encode filedebug) where
+  encode :: FileDebug -> ByteString
   encode = if pretty then A.encodePretty' config else A.encode
 
   config = A.defConfig { A.confIndent = A.Spaces 2, A.confNumFormat = A.Decimal }
@@ -84,23 +84,24 @@ printPass pretty pass = putStrLn (encode pass) where
 --                         instances                        --
 --------------------------------------------------------------
 
-instance A.ToJSON PassDebug where
-  toJSON PassDebug{..} = A.object ["file" .= file, "status" .= status, "data" .= output']
+instance A.ToJSON FileDebug where
+  toJSON FileDebug{..} = A.object ["file" .= file, "status" .= status, "data" .= output']
     where status = A.object (maybe ["type" .= ok] withErr error) where
             withErr e = ["type" .= err, "error" .= e]
             ok        = "ok" :: Text
             err       = "error" :: Text
           output' = A.object ["repr" .= outData, "type" .= debugModeText (mode output)] where
             outData = case output of
-              POutBlock output  -> A.toJSON output
-              POutLexer output  -> A.toJSON output
-              POutSyntax output -> A.toJSON output
+              PDebugBlock o  -> A.toJSON o
+              PDebugLexer o  -> A.toJSON o
+              PDebugSyntax o -> A.toJSON o
 
 --------------------------------------------------------------
 --                        Util func                         --
 --------------------------------------------------------------
 
-mode (POutBlock _)  = DebugTextBlock
-mode (POutLexer _)  = DebugTextLexer
-mode (POutSyntax _) = DebugTextParse
+mode :: PassDebug -> DebugKind
+mode (PDebugBlock _)  = DebugTextBlock
+mode (PDebugLexer _)  = DebugTextLexer
+mode (PDebugSyntax _) = DebugTextParse
 

@@ -5,7 +5,6 @@ import Protolude
 
 import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson.Types as A
-import qualified Data.Aeson as A
 
 import JoScript.Data.Position (Position)
 
@@ -30,15 +29,15 @@ instance A.ToJSON BpRepr where
   toJSON BpEnd         = A.object ["type" .= ("end"    :: Text)]
 
 instance A.FromJSON BlockPass where
-  parseJSON (A.Object o) = do
-    position <- o .: "position"
-    repr     <- o .: "repr" >>= decode
+  parseJSON (A.Object top) = do
+    position <- top .: "position"
+    repr     <- top .: "repr" >>= decode
     pure (Bp repr position) where
       decode (A.Object o) = o .: "type" >>= withType
       decode _            = mempty
 
       withType :: Text -> A.Parser BpRepr
-      withType "line"   = BpLine <$> o .: "data"
+      withType "line"   = BpLine <$> top .: "data"
       withType "indent" = pure BpIndent
       withType "dedent" = pure BpDedent
       withType "end"    = pure BpEnd

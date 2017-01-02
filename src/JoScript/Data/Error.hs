@@ -20,6 +20,7 @@ data Location = Known Position
 data Repr
   = IndentError IndentErrorT
   | LexerError LexerErrorT
+  | ParseError ParseErrorT
   deriving (Eq, Show)
 
 data IndentErrorT
@@ -27,11 +28,15 @@ data IndentErrorT
   deriving (Eq, Show)
 
 data LexerErrorT
-  = UnexpectedEnd
-  | UnexpectedToken Bp.BpRepr
-  | UnknownTokenStart Char
-  | InvalidIntSuffix Char
-  | DuplicateDecimial
+  = LUnexpectedEnd
+  | LUnexpectedToken Bp.BpRepr
+  | LUnknownTokenStart Char
+  | LInvalidIntSuffix Char
+  | LDuplicateDecimial
+  deriving (Eq, Show)
+
+data ParseErrorT
+  = PUnexpectedEnd
   deriving (Eq, Show)
 
 --------------------------------------------------------------
@@ -45,11 +50,11 @@ reprDescription (IndentError _) = "text:block"
 reprDescription (LexerError _) = "text:lexer"
 
 lexerErrMsg :: LexerErrorT -> Text
-lexerErrMsg UnexpectedEnd         = "unexpected lexer ended"
-lexerErrMsg (UnexpectedToken _)   = "unexpected block token"
-lexerErrMsg (UnknownTokenStart _) = "unexpected character"
-lexerErrMsg (InvalidIntSuffix _)  = "integer was suffixed with invalid character"
-lexerErrMsg DuplicateDecimial     = "duplicated decimal place in float"
+lexerErrMsg LUnexpectedEnd         = "unexpected lexer ended"
+lexerErrMsg (LUnexpectedToken _)   = "unexpected block token"
+lexerErrMsg (LUnknownTokenStart _) = "unexpected character"
+lexerErrMsg (LInvalidIntSuffix _)  = "integer was suffixed with invalid character"
+lexerErrMsg LDuplicateDecimial     = "duplicated decimal place in float"
 
 --------------------------------------------------------------
 --                         instances                        --
@@ -70,7 +75,7 @@ instance A.ToJSON IndentErrorT where
   toJSON ShallowDedent = A.object ["message" .= ("dedent depth is too shallow" :: Text)]
 
 instance A.ToJSON LexerErrorT where
-  toJSON e@(UnexpectedToken t)   = A.object ["message" .= lexerErrMsg e, "token" .= t]
-  toJSON e@(UnknownTokenStart c) = A.object ["message" .= lexerErrMsg e, "character" .= c]
-  toJSON e@(InvalidIntSuffix c)  = A.object ["message" .= lexerErrMsg e, "character" .= c]
+  toJSON e@(LUnexpectedToken t)   = A.object ["message" .= lexerErrMsg e, "token" .= t]
+  toJSON e@(LUnknownTokenStart c) = A.object ["message" .= lexerErrMsg e, "character" .= c]
+  toJSON e@(LInvalidIntSuffix c)  = A.object ["message" .= lexerErrMsg e, "character" .= c]
   toJSON e                       = A.object ["message" .= lexerErrMsg e]

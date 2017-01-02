@@ -79,9 +79,9 @@ loop Read = readToken >>= \case
 -- an error will occur with the awaited token is anything
 -- other than a new line
 loop (ReadMore payload offset) = readToken >>= \case
-  BpEnd    -> throwFromPosition (UnexpectedToken BpEnd)
-  BpDedent -> throwFromPosition (UnexpectedToken BpDedent)
-  BpIndent -> throwFromPosition (UnexpectedToken BpIndent)
+  BpEnd    -> throwFromPosition (LUnexpectedToken BpEnd)
+  BpDedent -> throwFromPosition (LUnexpectedToken BpDedent)
+  BpIndent -> throwFromPosition (LUnexpectedToken BpIndent)
   BpLine l ->
     let nl = T.append (line payload) l
      in loop (ContToken (payload { line = nl }) offset)
@@ -116,7 +116,7 @@ loop (StartToken line) = withLine line where
     withHead c
       | isIdentiferHead c = continueToken lexIdentifier
       | isDigit c         = continueToken lexUInt
-      | otherwise         = throwFromPosition (UnknownTokenStart c)
+      | otherwise         = throwFromPosition (LUnknownTokenStart c)
 
 -- traverse over non trival multicharacter tokens
 loop (ContToken payload i) = iter i where
@@ -179,15 +179,15 @@ lexUInt t i
   | isDigit head         = NextStep
   | head == '.'          = JumpStep (i + 1) lexUFloat
   | isNumTerminator head = EmitStep i (LpNumberLit . LpInteger . T.readInt)
-  | otherwise            = FailStep (InvalidIntSuffix head)
+  | otherwise            = FailStep (LInvalidIntSuffix head)
   where head = T.index t i
 
 lexUFloat :: Text -> Int -> TokenBranchStep
 lexUFloat t i
   | isDigit head         = NextStep
   | isNumTerminator head = EmitStep i (LpNumberLit . LpFloat . T.readFloat)
-  | head == '.'          = FailStep DuplicateDecimial
-  | otherwise            = FailStep (InvalidIntSuffix head)
+  | head == '.'          = FailStep LDuplicateDecimial
+  | otherwise            = FailStep (LInvalidIntSuffix head)
   where head = T.index t i
 
 --------------------------------------------------------------
@@ -218,7 +218,7 @@ readUpdate :: Monad m => Lexer m (Position, BpRepr)
 readUpdate = liftConduit C.await >>= \case
   Nothing -> do
     position <- use position'
-    throwError (known (LexerError UnexpectedEnd) position)
+    throwError (known (LexerError LUnexpectedEnd) position)
 
   Just (Right item) -> do
     let (Bp repr p) = item

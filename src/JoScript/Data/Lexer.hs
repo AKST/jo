@@ -40,6 +40,64 @@ data LpRepr
   | LpComment Text
   deriving (Eq, Show)
 
+--------------------------------------------------------------
+--                       predicates                         --
+--------------------------------------------------------------
+
+isEnd = (==) LpEnd
+
+isSpace t
+  | LpSpace _ <- t = True
+  | otherwise      = False
+
+isNewline = (==) LpNewline
+
+isIndent = (==) LpIndent
+
+isDedent = (==) LpDedent
+
+isPipe = (==) LpPipe
+
+isLBrace = (==) LpBraceL
+
+isRBrace = (==) LpBraceR
+
+isColon = (==) LpColon
+
+isQuote = (==) LpQuote
+
+isAssign = (==) LpAssign
+
+isRestOperator = (==) LpRestOperator
+
+isDotOperator = (==) LpDotOperator
+
+isDecoratorPre = (==) LpDecoratorPrefix
+
+isIdentifer token
+  | LpIdentifier _ <- token = True
+  | otherwise               = False
+
+isFloat t
+  | LpNumberLit (LpFloat _) <- t = True
+  | otherwise                    = False
+
+isInt t
+  | LpNumberLit (LpInteger _) <- t = True
+  | otherwise                      = False
+
+isString t
+  | LpString _ <- t = True
+  | otherwise       = False
+
+isComment t
+  | LpComment _ <- t = True
+  | otherwise        = False
+
+--------------------------------------------------------------
+--                         helpers                          --
+--------------------------------------------------------------
+
 toToken :: LpRepr -> Position -> LexerPass
 toToken k p = Lp k p
 

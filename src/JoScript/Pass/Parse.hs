@@ -7,7 +7,10 @@ import qualified Data.Conduit as C
 
 import Control.Lens ((.=), (%=), use)
 
+import Text.Parser.Combinators
+
 import JoScript.Util.Conduit (ResultSink, Result)
+import JoScript.Data.Config (FileBuildConfig(..))
 import JoScript.Data.Error (Error, known, Repr(ParseError), ParseErrorT(..))
 import JoScript.Data.Syntax (SynModule)
 import JoScript.Data.Position (Position)
@@ -72,12 +75,17 @@ root = undefined
 --                     Parse Recovery                       --
 --------------------------------------------------------------
 
+record :: LexerPass -> Parser m ()
+record pass = use recovery' >>= \case
+  RecEnd        -> pure ()
+  RecAdd s prev -> recovery' .= RecAdd s (pass:prev)
+
 {- # activateRecovery
  -
  - Any calls to await will also be recorded so if a recoverable
  - error takes place any fetched items during parse can be
  - recovered -}
-activateRecovery :: Monad m => Parser m ()
+activateRecovery :: Parser m ()
 activateRecovery = do
   state     <- get
   recovery' .= RecAdd state mempty
@@ -86,7 +94,7 @@ activateRecovery = do
  -
  - Discard the cache of any awaited items since the previous
  - call to `activateRecovery` -}
-forgetRecovery :: Monad m => Parser m ()
+forgetRecovery :: Parser m ()
 forgetRecovery = use recovery' >>= \case
   RecEnd      -> pure ()
   RecAdd st _ -> recovery' .= (recovery st)
@@ -94,12 +102,12 @@ forgetRecovery = use recovery' >>= \case
 {- # applyRecovery
  -
  - Restores all cached lexicons to the previous state -}
-applyRecovery :: Monad m => Parser m ()
+applyRecovery :: Parser m ()
 applyRecovery = use recovery' >>= \case
   RecEnd       -> pure ()
   RecAdd st sv -> put st *> liftConduit (forM_ sv (C.leftover . Right))
 
-instance Monad m => Alternative (Parser m) where
+instance Alternative (Parser m) where
   empty = do
     pos <- use position'
     throwError (known (ParseError PIncompleteAlt) pos)
@@ -115,6 +123,6 @@ instance Monad m => Alternative (Parser m) where
 
 {- whenever the monad stack is modified we'll only need
  - to update the lifting of conduit function calls here -}
-liftConduit :: Monad m => ParserConduit m a -> Parser m a
+liftConduit :: ParserConduit m a -> Parser m a
 liftConduit m = Parser (lift (lift m))
 

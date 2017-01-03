@@ -35,6 +35,7 @@ library
                      , JoScript.Pass.Lexer
                      , JoScript.Pass.Parse
                      , JoScript.Pass.Block
+                     , JoScript.Pass.Debug
                      , JoScript.Util.Text
                      , JoScript.Util.Json
                      , JoScript.Util.Debug
@@ -44,15 +45,18 @@ library
   build-depends:       base >= 4.7 && < 5,
                        mtl,
                        lens,
-                       aeson,
                        text,
-                       directory,
-                       bytestring,
-                       protolude,
-                       transformers,
-                       containers,
+                       aeson,
+                       parsers,
                        conduit,
+                       directory,
+                       resourcet,
+                       protolude,
+                       containers,
+                       bytestring,
+                       transformers,
                        aeson-pretty,
+                       monad-control,
                        ansi-wl-pprint,
                        template-haskell,
                        unordered-containers,

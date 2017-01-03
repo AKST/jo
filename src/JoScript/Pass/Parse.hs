@@ -5,7 +5,7 @@ import Protolude hiding (State, error)
 
 import qualified Data.Conduit as C
 
-import Control.Lens ((.=), use)
+import Control.Lens ((.=), (%=), use)
 
 import JoScript.Util.Conduit (ResultSink, Result)
 import JoScript.Data.Error (Error, known, Repr(ParseError), ParseErrorT(..))
@@ -15,15 +15,27 @@ import JoScript.Data.Lexer (LexerPass(..), LpRepr(..))
 import qualified JoScript.Data.Position as Position
 
 
-data Branch = BrInit | BrFrom LpRepr
-data State = S { position :: Position }
+data Recovery
+  = RecEnd
+  | RecAdd State [LexerPass]
+
+data Label = Label { position :: Position, description :: Text }
+type Labels = [Label]
+
+data State = S { recovery :: Recovery, labels :: Labels, position :: Position }
 
 --------------------------------------------------------------
 --                          Lens                            --
 --------------------------------------------------------------
 
+recovery' :: Functor f => (Recovery -> f Recovery) -> State -> f State
+recovery' f (S r l p) = fmap (\r' -> S r' l p) (f r)
+
+labels' :: Functor f => (Labels -> f Labels) -> State -> f State
+labels' f (S r l p) = fmap (\l' -> S r l' p) (f l)
+
 position' :: Functor f => (Position -> f Position) -> State -> f State
-position' f (S p) = fmap (\p' -> S  p') (f p)
+position' f (S r l p) = fmap (\p' -> S r l p') (f p)
 
 --------------------------------------------------------------
 --                      Entry point                         --
@@ -36,8 +48,10 @@ newtype Parser m a   = Parser { run :: ExceptT Error (StateT State (ParserCondui
 
 runParsePass :: Monad m => ParserConduit m (Result SynModule)
 runParsePass =
-  let s = runExceptT (run (loop BrInit))
-      i = S { position = Position.init }
+  let s = runExceptT (run root)
+      i = S { recovery = RecEnd
+            , labels   = mempty
+            , position = Position.init }
    in evalStateT s i >>= \case
       Right _____ -> error "not yet complete"
       Left except -> pure (Left except)
@@ -46,25 +60,54 @@ runParsePass =
 --                      Event loop                          --
 --------------------------------------------------------------
 
-loop :: Monad m => Branch -> Parser m ()
-loop BrInit = readUpdate >>= \_ -> pure ()
-loop (BrFrom _) = pure ()
+root :: Monad m => Parser m SynModule
+root = undefined
 
 --------------------------------------------------------------
 --                        Util func                         --
 --------------------------------------------------------------
 
-readUpdate :: Monad m => Parser m (Position, LpRepr)
-readUpdate = liftConduit C.await >>= \case
-  Nothing -> do
-    position <- use position'
-    throwError (known (ParseError PUnexpectedEnd) position)
 
-  Just (Right (Lp repr p)) -> do
-    position' .= p
-    pure (p, repr)
+--------------------------------------------------------------
+--                     Parse Recovery                       --
+--------------------------------------------------------------
 
-  Just (Left except) -> throwError except
+{- # activateRecovery
+ -
+ - Any calls to await will also be recorded so if a recoverable
+ - error takes place any fetched items during parse can be
+ - recovered -}
+activateRecovery :: Monad m => Parser m ()
+activateRecovery = do
+  state     <- get
+  recovery' .= RecAdd state mempty
+
+{- # forgetRecovery
+ -
+ - Discard the cache of any awaited items since the previous
+ - call to `activateRecovery` -}
+forgetRecovery :: Monad m => Parser m ()
+forgetRecovery = use recovery' >>= \case
+  RecEnd      -> pure ()
+  RecAdd st _ -> recovery' .= (recovery st)
+
+{- # applyRecovery
+ -
+ - Restores all cached lexicons to the previous state -}
+applyRecovery :: Monad m => Parser m ()
+applyRecovery = use recovery' >>= \case
+  RecEnd       -> pure ()
+  RecAdd st sv -> put st *> liftConduit (forM_ sv (C.leftover . Right))
+
+instance Monad m => Alternative (Parser m) where
+  empty = do
+    pos <- use position'
+    throwError (known (ParseError PIncompleteAlt) pos)
+
+  left <|> right = do
+    activateRecovery
+    catchError (left <* forgetRecovery)
+      (\_ -> applyRecovery *> right)
 
 --------------------------------------------------------------
 --                        Wrap func                         --

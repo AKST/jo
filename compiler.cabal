@@ -24,25 +24,22 @@ flag production
 library
   hs-source-dirs:      src
   exposed-modules:     JoScript.Data.Position
-                     , JoScript.Util.Debug
-                     , JoScript.Data.Error
                      , JoScript.Data.Syntax
+                     , JoScript.Data.Error
                      , JoScript.Data.Block
                      , JoScript.Data.Lexer
                      , JoScript.Data.Config
-
                      , JoScript.Config.ArgParsing
-
                      , JoScript.Job
                      , JoScript.Job.Build
-
                      , JoScript.Pass.Lexer
                      , JoScript.Pass.Parse
                      , JoScript.Pass.Block
                      , JoScript.Util.Text
-                     , JoScript.Util.Strings
                      , JoScript.Util.Json
+                     , JoScript.Util.Debug
                      , JoScript.Util.Conduit
+                     , JoScript.Util.Strings
 
   build-depends:       base >= 4.7 && < 5,
                        mtl,
@@ -61,8 +58,6 @@ library
                        unordered-containers,
                        optparse-applicative,
                        conduit-combinators
-
-
   default-language:    Haskell2010
   Default-Extensions:  NoImplicitPrelude
                      , DuplicateRecordFields

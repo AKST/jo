@@ -37,6 +37,7 @@ data LexerErrorT
 
 data ParseErrorT
   = PUnexpectedEnd
+  | PIncompleteAlt
   deriving (Eq, Show)
 
 --------------------------------------------------------------
@@ -61,6 +62,7 @@ lexerErrMsg LDuplicateDecimial       = "duplicated decimal place in float"
 
 parseErrMsg :: ParseErrorT -> Text
 parseErrMsg PUnexpectedEnd = "unexpected parse end during parse"
+parseErrMsg PIncompleteAlt = "implementation error"
 
 --------------------------------------------------------------
 --                         instances                        --

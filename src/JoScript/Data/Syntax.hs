@@ -126,7 +126,9 @@ exprType (SynStringLit _) = "string"
 exprType (SynComment _) = "comment"
 
 instance A.ToJSON SynModule where
-  toJSON SynModule{..} = A.object ["source-file" .= fileName, "statements" .= statements]
+  toJSON SynModule{..} = A.object [ty, fn, "statements" .= statements] where
+    ty = "type" .= ("module" :: Text)
+    fn = "file" .= fileName
 
 instance A.ToJSON SynExpr where
   toJSON SynExpr{..} = withObject ["position" .= position] (A.toJSON expr)

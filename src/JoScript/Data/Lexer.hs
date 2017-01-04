@@ -124,16 +124,20 @@ kindName (LpNumberLit (LpFloat   _)) = "number:float"
 
 
 instance A.ToJSON LexerPass where
-  toJSON Lp{..} = A.object ["position" .= position, "repr" .= encode repr] where
-    default' :: A.Value
-    default' = A.object ["type" .= kindName repr]
+  toJSON Lp{..} = A.object ["position" .= position, "repr" .= repr]
 
-    encode (LpString s)                = withObject ["value" .= s] default'
-    encode (LpComment c)               = withObject ["value" .= c] default'
-    encode (LpIdentifier i)            = withObject ["value" .= i] default'
-    encode (LpNumberLit (LpFloat f))   = withObject ["value" .= f] default'
-    encode (LpNumberLit (LpInteger i)) = withObject ["value" .= i] default'
-    encode _                           = default'
+instance A.ToJSON LpRepr where
+  toJSON token = withType token where
+
+    default' :: A.Value
+    default' = A.object ["type" .= kindName token]
+
+    withType (LpString s)                = withObject ["value" .= s] default'
+    withType (LpComment c)               = withObject ["value" .= c] default'
+    withType (LpIdentifier i)            = withObject ["value" .= i] default'
+    withType (LpNumberLit (LpFloat f))   = withObject ["value" .= f] default'
+    withType (LpNumberLit (LpInteger i)) = withObject ["value" .= i] default'
+    withType _                           = default'
 
 
 

@@ -15,12 +15,13 @@ import JoScript.Data.Config ( DebugMode(..)
                             , FileBuildConfig(..)
                             , runFileBuildM)
 
+import JoScript.Data.Debug (FileDebug)
 import JoScript.Pass.Block (runBlockPass)
 import JoScript.Pass.Lexer (runLexerPass)
 import JoScript.Pass.Parse (runParsePass)
 import JoScript.Pass.Debug (runDebugPass)
 import JoScript.Util.Conduit (characterStream, ResultConduit)
-import JoScript.Util.Debug (consumeBlockPass, consumeLexerPass, consumeSyntax, printPass, FileDebug)
+import JoScript.Util.Debug (consumeBlockPass, consumeLexerPass, consumeSyntax, printPass)
 import qualified JoScript.Data.Config as Con
 
 buildFiles :: (MonadResource m, MonadBaseControl IO m) => Con.BuildConfig -> m ()

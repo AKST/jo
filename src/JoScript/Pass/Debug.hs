@@ -10,6 +10,7 @@ import JoScript.Data.Config ( DebugMode(..)
                             , FileBuildConfig(..)
                             , runFileBuildM)
 
+import JoScript.Data.Debug (FileDebug)
 import JoScript.Data.Block (BlockPass)
 import JoScript.Data.Lexer (LexerPass)
 import JoScript.Data.Syntax (SynModule)
@@ -18,7 +19,7 @@ import JoScript.Pass.Block (runBlockPass)
 import JoScript.Pass.Lexer (runLexerPass)
 import JoScript.Pass.Parse (runParsePass)
 import JoScript.Util.Conduit (characterStream, ResultSink, ResultConduit, Result)
-import JoScript.Util.Debug (consumeBlockPass, consumeLexerPass, consumeSyntax, FileDebug)
+import JoScript.Util.Debug (consumeBlockPass, consumeLexerPass, consumeSyntax)
 
 runDebugPass :: Monad m => DebugKind -> ResultSink Char m FileDebug
 runDebugPass DebugTextBlock = withBlockPass .| consumeBlockPass

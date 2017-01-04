@@ -1,10 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 module JoScript.Util.Debug
-  ( PassDebug(..)
-  , FileDebug(..)
-  , mode
-  , printPass
+  ( printPass
   , consumeSyntax
   , consumeBlockPass
   , consumeLexerPass
@@ -22,21 +19,13 @@ import qualified Data.Conduit as C
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Encode.Pretty as A
 
+import JoScript.Data.Debug
 import JoScript.Data.Error (Error)
 import JoScript.Data.Lexer (LexerPass)
 import JoScript.Data.Block (BlockPass)
 import JoScript.Data.Syntax (SynModule)
 import JoScript.Data.Config (DebugKind(..), debugModeText, FileBuildM(..), filename')
 import JoScript.Util.Conduit (Result, ResultSink)
-
-data PassDebug
-  = PDebugLexer (Seq LexerPass)
-  | PDebugBlock (Seq BlockPass)
-  | PDebugSyntax (Maybe SynModule)
-  deriving (Eq, Show)
-
-data FileDebug = FileDebug { file :: Text, output :: PassDebug, error :: Maybe Error }
-  deriving (Eq, Show)
 
 --------------------------------------------------------------
 --                          exports                         --
@@ -84,29 +73,4 @@ printPass pretty filedebug = putStrLn (encode filedebug) where
   encode = if pretty then A.encodePretty' config else A.encode
 
   config = A.defConfig { A.confIndent = A.Spaces 2, A.confNumFormat = A.Decimal }
-
---------------------------------------------------------------
---                         instances                        --
---------------------------------------------------------------
-
-instance A.ToJSON FileDebug where
-  toJSON FileDebug{..} = A.object ["file" .= file, "status" .= status, "data" .= output']
-    where status = A.object (maybe ["type" .= ok] withErr error) where
-            withErr e = ["type" .= err, "error" .= e]
-            ok        = "ok" :: Text
-            err       = "error" :: Text
-          output' = A.object ["repr" .= outData, "type" .= debugModeText (mode output)] where
-            outData = case output of
-              PDebugBlock o  -> A.toJSON o
-              PDebugLexer o  -> A.toJSON o
-              PDebugSyntax o -> A.toJSON o
-
---------------------------------------------------------------
---                        Util func                         --
---------------------------------------------------------------
-
-mode :: PassDebug -> DebugKind
-mode (PDebugBlock _)  = DebugTextBlock
-mode (PDebugLexer _)  = DebugTextLexer
-mode (PDebugSyntax _) = DebugTextParse
 

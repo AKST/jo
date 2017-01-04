@@ -19,10 +19,10 @@ import Control.Monad.Trans.Control ( MonadBaseControl(..)
                                    , defaultLiftWith
                                    )
 
-data BuildConfig = BuildC { debug :: Maybe DebugMode, files :: [FilePath] }
+data BuildConfig = BuildC { debug :: Maybe DebugMode, files :: [Text] }
   deriving (Show)
 
-data FileBuildConfig = FileBC { filename :: FilePath }
+data FileBuildConfig = FileBC { filename :: Text }
   deriving (Show)
 
 data Job = JobBuild BuildConfig
@@ -73,10 +73,10 @@ instance MonadBaseControl IO m => MonadBaseControl IO (FileBuildM m) where
 debug' :: Functor f => (Maybe DebugMode -> f (Maybe DebugMode)) -> BuildConfig -> f BuildConfig
 debug' fn (BuildC d f) = fmap (\d' -> BuildC d' f) (fn d)
 
-files' :: Functor f => ([FilePath] -> f [FilePath]) -> BuildConfig -> f BuildConfig
+files' :: Functor f => ([Text] -> f [Text]) -> BuildConfig -> f BuildConfig
 files' fn (BuildC d f) = fmap (\f' -> BuildC d f') (fn f)
 
-filename' :: Functor f => (FilePath -> f FilePath) -> FileBuildConfig -> f FileBuildConfig
+filename' :: Functor f => (Text -> f Text) -> FileBuildConfig -> f FileBuildConfig
 filename' fn (FileBC f) = fmap (\f' -> FileBC f') (fn f)
 
 --------------------------------------------------------------

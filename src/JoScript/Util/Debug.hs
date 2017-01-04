@@ -35,7 +35,7 @@ data PassDebug
   | PDebugSyntax (Maybe SynModule)
   deriving (Eq, Show)
 
-data FileDebug = FileDebug { file :: FilePath, output :: PassDebug, error :: Maybe Error }
+data FileDebug = FileDebug { file :: Text, output :: PassDebug, error :: Maybe Error }
   deriving (Eq, Show)
 
 --------------------------------------------------------------

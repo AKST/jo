@@ -13,6 +13,7 @@ import Conduit (MonadResource, ResourceT, sourceFile)
 
 import Data.Conduit ((.|), mapOutput)
 import Data.Conduit.List (mapFoldable)
+import qualified Data.Text as ST
 import qualified Data.Conduit as C
 import qualified Data.Text.Lazy as LT
 
@@ -32,6 +33,6 @@ type ResultSink i      m = C.ConduitM (Result i) Void (Inner m)
 
 characterStream :: MonadResource m => ResultSource Char m ()
 characterStream = do
-  f <- view filename'
+  f <- ST.unpack <$> view filename'
   mapOutput Right (sourceFile f .| mapFoldable LT.unpack)
 

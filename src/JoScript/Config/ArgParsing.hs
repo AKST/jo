@@ -11,6 +11,7 @@ import qualified Options.Applicative.Extra as A
 import qualified Options.Applicative.Builder as A
 
 import Data.Monoid ((<>))
+import qualified Data.Text as T
 
 import JoScript.Util.Strings (multiline, toDocument)
 import JoScript.Data.Config (Job(..), DebugMode(..), DebugKind(..), BuildConfig(..))
@@ -32,7 +33,7 @@ parseArgs = A.info (A.subparser buildParser) meta where
 
 parseBuildMode :: A.Parser Job
 parseBuildMode = (\d f -> JobBuild (BuildC d f)) <$> debug <*> files where
-  files = some (A.argument A.str meta) where
+  files = some (T.pack <$> A.argument A.str meta) where
     meta = A.help ("A list of main files") <> A.metavar "MAINS"
 
   debug = (\m p -> Just (Debug m p)) <$> debugMode <*> pretty

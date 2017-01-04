@@ -12,7 +12,7 @@ import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
 
 data Position = Position { line :: Word64, column :: Word64 }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq)
 
 startIndex :: Word64
 startIndex = 1
@@ -33,6 +33,12 @@ update _ = moveRight
 moveOver :: Text -> Position -> Position
 moveOver (uncons -> Just (h, t)) p = moveOver t (update h p)
 moveOver _                       p = p
+
+instance Ord Position where
+  (>) (Position al ac) (Position bl bc)
+    | al > bl             = True
+    | al == bl && ac > bc = True
+    | otherwise           = False
 
 instance A.ToJSON Position where
   toJSON (Position line column) =

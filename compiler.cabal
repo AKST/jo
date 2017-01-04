@@ -1,8 +1,8 @@
 name:                compiler
 version:             0.0.1.0
-synopsis:            Initial project template from stack
+synopsis:            Code base of the Jo compiler
 description:         Please see README.md
-homepage:            https://github.com/githubuser/compiler#readme
+homepage:            https://github.com/akst/jo#readme
 license:             MIT
 license-file:        LICENSE
 author:              Angus Thomsen
@@ -81,7 +81,6 @@ library
                , -Wincomplete-patterns
                , -Wname-shadowing
 
-
 executable client
   hs-source-dirs:      client
   main-is:             Main.hs
@@ -108,4 +107,4 @@ test-suite compiler-test
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/compiler
+  location: https://github.com/akst/jo

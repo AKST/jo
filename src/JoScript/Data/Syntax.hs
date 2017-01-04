@@ -22,7 +22,7 @@ import JoScript.Data.Position (Position)
 type SynStringLitT = Text
 
 newtype SynId = SynId { get :: Text }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Ref
   -- references

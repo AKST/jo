@@ -76,6 +76,8 @@ data SynExprRepr where
   -- 'expression
   SynQuote      :: SynExpr    -> SynExprRepr
 
+  SynSymbol     :: SynId      -> SynExprRepr
+
   -- in [fn a b c *d e: e]
   -- arg-1 = [fn ...
   -- arg-2 = ... a b c *d e: e]
@@ -116,6 +118,7 @@ exprType (SynDecorator _ _)  = "decorator"
 exprType (SynReference (RefIdentity _))  = "reference:identity"
 exprType (SynReference (RefProperty _ _))  = "reference:property"
 exprType (SynQuote _) = "quote"
+exprType (SynSymbol _) = "symbol"
 exprType (SynInvokation _ _) = "invokation"
 exprType (SynDeclaration (RefIdentity   _) _) = "declarion:identity"
 exprType (SynDeclaration (RefProperty _ _) _) = "declarion:property"
@@ -163,6 +166,7 @@ instance A.ToJSON SynExprRepr where
     forKind (SynContextual e)         = ["expression" .= e]
     forKind (SynDecorator d t)        = ["decorator" .= d, "target" .= t]
     forKind (SynReference r)          = ["reference" .= r]
+    forKind (SynSymbol symbol)        = ["name" .= symbol]
     forKind (SynQuote quoted)         = ["quoted" .= quoted]
     forKind (SynInvokation func args) = ["invoked" .= func, "arguments" .= args]
     forKind (SynDeclaration r value)  = ["reference" .= r, "value" .= value]

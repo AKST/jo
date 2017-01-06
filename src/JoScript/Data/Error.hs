@@ -8,9 +8,11 @@ import qualified Data.Aeson.Types as A
 
 
 import JoScript.Data.Position (Position)
-import JoScript.Data.Block as Bp
-import JoScript.Data.Lexer as Lp
 import JoScript.Util.Json (withObject)
+import JoScript.Data.Lexer (LpRepr(..), LpReprKind(..))
+import qualified JoScript.Data.Block as Bp
+import qualified JoScript.Data.Lexer as Lp
+
 
 data Error = Error Repr Location
   deriving (Eq, Show)
@@ -43,6 +45,7 @@ data LexerErrorT
 data ParseErrorT
   = PUnexpectedEnd
   | PIncompleteAlt
+  | PExpectedToken LpReprKind LpRepr
   | PUnexpectedToken LpRepr
   deriving (Eq, Show)
 
@@ -70,6 +73,7 @@ parseErrMsg :: ParseErrorT -> Text
 parseErrMsg PUnexpectedEnd = "unexpected parse end during parse"
 parseErrMsg PIncompleteAlt = "implementation error"
 parseErrMsg PUnexpectedToken{} = "encounted unexpected token"
+parseErrMsg PExpectedToken{} = "Expected token of type {expected-type}, instead got {read}"
 
 {- Determines which error is most recently occuring in a file -}
 newestError :: Error -> Error -> Error
@@ -111,6 +115,7 @@ instance A.ToJSON LexerErrorT where
 
 instance A.ToJSON ParseErrorT where
   toJSON t = withObject ["message" .= parseErrMsg t] (withType t) where
-    withType (PUnexpectedToken t) = A.object ["token" .= t]
+    withType (PUnexpectedToken t) = A.object ["read" .= t]
+    withType (PExpectedToken e t) = A.object ["read" .= t, "expected-type" .= e]
     withType ____________________ = A.object []
 

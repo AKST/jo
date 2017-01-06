@@ -32,7 +32,7 @@ import JoScript.Data.Syntax ( SynModule(..)
                             , SynId(SynId)
                             )
 import JoScript.Data.Position (Position)
-import JoScript.Data.Lexer (LexerPass(..), LpRepr(..))
+import JoScript.Data.Lexer (LexerPass(..), LpRepr(..), LpReprKind(..), reprKind)
 import qualified JoScript.Data.Lexer as Lexer
 import qualified JoScript.Data.Position as Position
 
@@ -96,7 +96,7 @@ block :: Monad m => Parser m (Seq SynExpr)
 block = iter mempty <?> "block" where
   iter acc = newItem acc <|> emptyLine <|> end where
     emptyLine = newline >> iter acc
-    end       = consumeIf Lexer.isEnd >> pure acc
+    end       = consumeKind LpKindEnd >> pure acc
 
   newItem acc = do
     item <- statement <* endOfLine
@@ -116,7 +116,7 @@ unwrappedInvoke = (SynInvokation <$> expression <*> args >>= pureExpr) <?> "func
 
     positional = (expression `sepBy1` some space) <?> "positional arguments"
 
-    rest = consumeIf Lexer.isRestOperator *> expression
+    rest = consumeKind LpKindRestOperator *> expression
 
     keywords :: Monad m => Parser m (Map SynId SynExpr)
     keywords = (Map.fromList . toList <$> pairs) <?> "keyword arguments"
@@ -124,7 +124,7 @@ unwrappedInvoke = (SynInvokation <$> expression <*> args >>= pureExpr) <?> "func
             pair    = (,) <$> keyword <*> (expression <?> "keyword value")
             keyword = (name <* colon <* spaces) <?> "keyword" where
               name  = synIdentifier <?> "keyword name"
-              colon = consumeIf Lexer.isColon <?> "suffix"
+              colon = consumeKind LpKindColon <?> "suffix"
 
 propableExpressions :: Monad m => [Parser m SynExpr]
 propableExpressions = [contextual, string, symbol, identifier]
@@ -144,11 +144,11 @@ property :: Monad m => Parser m SynExpr
 property = ((conn <$> expr <*> prop) >>= pureExpr) <?> "property" where
   expr = choice propableExpressions
   conn e p = SynReference (RefProperty e p)
-  prop = consumeIf Lexer.isDotOperator *> synIdentifier
+  prop = consumeKind LpKindDotOperator *> synIdentifier
 
 quote :: Monad m => Parser m SynExpr
 quote = (tick *> (SynQuote <$> expr) >>= pureExpr) <?> "quote" where
-  tick = consumeIf Lexer.isQuote
+  tick = consumeKind LpKindQuote
   expr = choice quoteableExpressions
 
 string :: Monad m => Parser m SynExpr
@@ -159,28 +159,27 @@ string = (SynStringLit <$> stringToken >>= pureExpr) <?> "string" where
 
 symbol :: Monad m => Parser m SynExpr
 symbol = (colon *> (SynSymbol <$> synIdentifier) >>= pureExpr) <?> "symbol" where
-  colon  = consumeIf Lexer.isColon
+  colon  = consumeKind LpKindColon
 
 contextual :: Monad m => Parser m SynExpr
 contextual = (dot *> (SynContextual <$> synIdentifier) >>= pureExpr) <?> "contextual" where
-  dot = consumeIf Lexer.isDotOperator
+  dot = consumeKind LpKindDotOperator
 
 identifier :: Monad m => Parser m SynExpr
-identifier = parser <?> "identifier" where
-  parser = (SynReference . RefIdentity <$> synIdentifier <* notColon) >>= pureExpr
-  notColon = failIf (consumeIf Lexer.isColon)
+identifier = (SynReference . RefIdentity <$> id >>= pureExpr) <?> "identifier" where
+  id = synIdentifier <* failKind LpKindColon
 
 newline :: Monad m => Parser m ()
-newline = void (consumeIf Lexer.isNewline) <?> "newline"
+newline = void (consumeKind LpKindNewline) <?> "newline"
 
 endOfLine :: Monad m => Parser m ()
-endOfLine = newline <|> void (lookAhead (consumeIf Lexer.isEnd))
+endOfLine = newline <|> void (lookAhead (consumeKind LpKindEnd))
 
 space :: Monad m => Parser m ()
-space = void (consumeIf Lexer.isSpace) <?> "space"
+space = void (consumeKind LpKindSpace) <?> "space"
 
 spaces :: Monad m => Parser m ()
-spaces = void (some (consumeIf Lexer.isSpace)) <?> "spaces"
+spaces = void (some (consumeKind LpKindSpace)) <?> "spaces"
 
 synIdentifier :: Monad m => Parser m SynId
 synIdentifier = consume >>= \case
@@ -206,8 +205,8 @@ try p = (Just <$> p) <|> pure Nothing
 try' :: a -> Parser m a -> Parser m a
 try' a p = fromMaybe a <$> try p
 
-failIf :: Parser m LpRepr -> Parser m ()
-failIf m = try m >>= \case
+failKind :: Monad m => LpReprKind -> Parser m ()
+failKind k = try (consumeKind k) >>= \case
   Just t  -> throwFromHere (PUnexpectedToken t)
   Nothing -> pure ()
 
@@ -232,11 +231,11 @@ consume = do
   record t
   pure repr
 
-consumeIf :: Monad m => (LpRepr -> Bool) -> Parser m LpRepr
-consumeIf predicate = consume >>= \repr ->
-  if predicate repr
+consumeKind :: Monad m => LpReprKind -> Parser m LpRepr
+consumeKind kind = consume >>= \repr ->
+  if kind == reprKind repr
     then pure repr
-    else throwFromHere (PUnexpectedToken repr)
+    else throwFromHere (PExpectedToken kind repr)
 
 rawAwait :: Monad m => Parser m LexerPass
 rawAwait = liftConduit C.await >>= \case

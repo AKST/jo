@@ -126,10 +126,13 @@ unwrappedInvoke = (SynInvokation <$> expression <*> args >>= pureExpr) <?> "func
               colon = consumeKind LpKindColon <?> "suffix"
 
 quoteableExpressions :: Monad m => [Parser m SynExpr]
-quoteableExpressions = [contextual, string, symbol, reference, number]
+quoteableExpressions = [nestedCall, contextual, string, symbol, reference, number]
 
 expression :: Monad m => Parser m SynExpr
 expression = choice (quote : quoteableExpressions) <?> "expression"
+
+nestedCall :: Monad m => Parser m SynExpr
+nestedCall = (consumeKind LpKindBraceL) *> unwrappedInvoke <* (consumeKind LpKindBraceR)
 
 comment :: Monad m => Parser m SynExpr
 comment = consume >>= \case
@@ -163,7 +166,6 @@ contextual = (dot *> (SynContextual <$> synIdentifier) >>= pureExpr) <?> "contex
 
 reference :: Monad m => Parser m SynExpr
 reference = ref mempty <?> "identifier" where
-
   reduceRef :: Monad m => Seq (Position, SynId) -> Parser m SynExpr
   reduceRef (viewl ->         EmptyL) = throwFromHere PImpossible
   reduceRef (viewl -> (p, x) :< rest) = iter rest (SynExpr (SynReference (RefIdentity x)) p) where
@@ -178,7 +180,6 @@ reference = ref mempty <?> "identifier" where
       LpDotOperator -> consume >> ref (acc |> item)
       LpColon       -> throwFromHere (PUnexpectedToken LpColon)
       _______       -> reduceRef (acc |> item)
-
 
 newline :: Monad m => Parser m ()
 newline = void (consumeKind LpKindNewline) <?> "newline"

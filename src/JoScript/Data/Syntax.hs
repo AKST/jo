@@ -175,3 +175,4 @@ instance A.ToJSON SynExprRepr where
     forKind (SynNumLit (SynFltLit i)) = ["float" .= i]
     forKind (SynStringLit string)     = ["string" .= string]
     forKind (SynComment commment)     = ["contents" .= commment]
+

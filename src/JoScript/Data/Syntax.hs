@@ -163,7 +163,7 @@ instance A.ToJSON SynParamsDef where
 
 instance A.ToJSON SynExprRepr where
   toJSON expr = A.object ["type" .= exprType expr, "value" .= A.object (forKind expr)] where
-    forKind (SynContextual e)         = ["expression" .= e]
+    forKind (SynContextual i)         = ["identifier" .= i]
     forKind (SynDecorator d t)        = ["decorator" .= d, "target" .= t]
     forKind (SynReference r)          = ["reference" .= r]
     forKind (SynSymbol symbol)        = ["name" .= symbol]

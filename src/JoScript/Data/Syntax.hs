@@ -12,7 +12,7 @@ module JoScript.Data.Syntax where
 import Protolude
 
 import Data.Aeson ((.=))
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Aeson as A
 
 import JoScript.Util.Json (withObject)

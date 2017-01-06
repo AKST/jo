@@ -5,8 +5,11 @@ import Prelude (undefined)
 import Protolude hiding (State, undefined, try)
 
 import Data.Sequence ((|>))
+import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Conduit as C
+
+import Text.Parser.Combinators (choice)
 
 import Control.Lens ((.=), (%=), use, view)
 
@@ -104,20 +107,25 @@ unwrappedInvoke = SynInvokation <$> func <*> args >>= pureExpr where
 
   args :: Monad m => Parser m SynParamsApp
   args = SynParamsApp <$> positional <*> rest <*> keywords where
-    rest       = pure Nothing
-    keywords   = error "keywords unimplemented"
+
     positional = expression `sepBy1` some space
 
-expression :: Monad m => Parser m SynExpr
-expression = quote
-         <|> contextual
-         <|> symbol
-         <|> property
-         <|> identifier
+    rest = pure Nothing
 
-{- expressions that can have properties -}
-expressionWithProp :: Monad m => Parser m SynExpr
-expressionWithProp = contextual <|> identifier
+    keywords :: Monad m => Parser m (Map SynId SynExpr)
+    keywords = (Map.fromList . toList) <$> pairs
+      where pairs   = pair `sepBy` some space
+            pair    = (,) <$> (keyword <* some space) <*> expression
+            keyword = synIdentifier <* consumeIf Lexer.isColon
+
+propableExpressions :: Monad m => [Parser m SynExpr]
+propableExpressions = [contextual, string, symbol, identifier]
+
+quoteableExpressions :: Monad m => [Parser m SynExpr]
+quoteableExpressions = property : propableExpressions
+
+expression :: Monad m => Parser m SynExpr
+expression = choice (quote : quoteableExpressions)
 
 comment :: Monad m => Parser m SynExpr
 comment = consume >>= \case
@@ -125,14 +133,21 @@ comment = consume >>= \case
   token         -> throwFromHere (PUnexpectedToken token)
 
 property :: Monad m => Parser m SynExpr
-property = (conn <$> expressionWithProp <*> prop) >>= pureExpr where
+property = (conn <$> expr <*> prop) >>= pureExpr where
+  expr = choice propableExpressions
   conn e p = SynReference (RefProperty e p)
   prop = consumeIf Lexer.isDotOperator *> synIdentifier
 
 quote :: Monad m => Parser m SynExpr
 quote = tick *> (SynQuote <$> expr) >>= pureExpr where
   tick = consumeIf Lexer.isQuote
-  expr = failIf tick *> expression
+  expr = choice quoteableExpressions
+
+string :: Monad m => Parser m SynExpr
+string = (SynStringLit <$> stringToken) >>= pureExpr where
+  stringToken = consume >>= \case
+    LpString string -> pure string
+    token           -> throwFromHere (PUnexpectedToken token)
 
 symbol :: Monad m => Parser m SynExpr
 symbol = colon *> (SynSymbol <$> synIdentifier) >>= pureExpr where
@@ -159,6 +174,10 @@ synIdentifier = consume >>= \case
 --------------------------------------------------------------
 --                   Parse Combinators                      --
 --------------------------------------------------------------
+
+sepBy :: Parser m a -> Parser m b -> Parser m (Seq a)
+sepBy elem sep = (elem `sepBy1` sep) <|> pure mempty
+
 
 sepBy1 :: Parser m a -> Parser m b -> Parser m (Seq a)
 sepBy1 elem sep = elem >>= \e -> iter (mempty |> e) where

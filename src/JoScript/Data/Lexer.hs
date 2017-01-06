@@ -84,8 +84,8 @@ reprKind LpDecoratorPrefix = LpKindDecoratorPrefix
 reprKind (LpIdentifier _)  = LpKindIdentifier
 reprKind (LpString _)      = LpKindString
 reprKind (LpComment _)     = LpKindComment
-reprKind (LpNumberLit (LpFloat _))   = LpKindIntegerLit
-reprKind (LpNumberLit (LpInteger _)) = LpKindFloatLit
+reprKind (LpNumberLit (LpFloat _))   = LpKindFloatLit
+reprKind (LpNumberLit (LpInteger _)) = LpKindIntegerLit
 
 --------------------------------------------------------------
 --                         helpers                          --

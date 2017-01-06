@@ -44,6 +44,7 @@ data LexerErrorT
 
 data ParseErrorT
   = PUnexpectedEnd
+  | PImpossible
   | PIncompleteAlt
   | PExpectedToken LpReprKind LpRepr
   | PUnexpectedToken LpRepr
@@ -73,7 +74,8 @@ parseErrMsg :: ParseErrorT -> Text
 parseErrMsg PUnexpectedEnd = "unexpected parse end during parse"
 parseErrMsg PIncompleteAlt = "implementation error"
 parseErrMsg PUnexpectedToken{} = "encounted unexpected token"
-parseErrMsg PExpectedToken{} = "Expected token of type {expected-type}, instead got {read}"
+parseErrMsg PExpectedToken{} = "Expected different token"
+parseErrMsg PImpossible = "Impossible error"
 
 {- Determines which error is most recently occuring in a file -}
 newestError :: Error -> Error -> Error

@@ -4,7 +4,7 @@ module JoScript.Pass.Parse (runParsePass) where
 import Prelude (undefined)
 import Protolude hiding (State, undefined, try)
 
-import Data.Sequence ((|>))
+import Data.Sequence ((|>), ViewL(..), viewl)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -24,15 +24,20 @@ import JoScript.Data.Error ( Error(..)
                            , newestError
                            , Label(..)
                            )
-import JoScript.Data.Syntax ( SynModule(..)
+import JoScript.Data.Syntax ( SynModule(SynModule)
                             , SynExpr(..)
+                            , SynNumLitT(..)
                             , SynExprRepr(..)
                             , SynParamsApp(..)
                             , Ref(..)
                             , SynId(SynId)
                             )
 import JoScript.Data.Position (Position)
-import JoScript.Data.Lexer (LexerPass(..), LpRepr(..), LpReprKind(..), reprKind)
+import JoScript.Data.Lexer ( LexerPass(..)
+                           , LpRepr(..)
+                           , LpNumber(..)
+                           , LpReprKind(..)
+                           , reprKind)
 import qualified JoScript.Data.Lexer as Lexer
 import qualified JoScript.Data.Position as Position
 
@@ -91,16 +96,11 @@ runParsePass =
 
 root :: Monad m => Parser m SynModule
 root = SynModule <$> block <*> view filename'
+  where block = statements <* consumeKind LpKindEnd
 
-block :: Monad m => Parser m (Seq SynExpr)
-block = iter mempty <?> "block" where
-  iter acc = newItem acc <|> emptyLine <|> end where
-    emptyLine = newline >> iter acc
-    end       = consumeKind LpKindEnd >> pure acc
-
-  newItem acc = do
-    item <- statement <* endOfLine
-    iter (acc |> item)
+statements :: Monad m => Parser m (Seq SynExpr)
+statements = (statement `sepEndBy1` some sep) <?> "block"
+  where sep = try spaces >> newline
 
 statement :: Monad m => Parser m SynExpr
 statement = parser <?> "statement" where
@@ -108,11 +108,10 @@ statement = parser <?> "statement" where
 
 unwrappedInvoke :: Monad m => Parser m SynExpr
 unwrappedInvoke = (SynInvokation <$> expression <*> args >>= pureExpr) <?> "function call" where
-
   args :: Monad m => Parser m SynParamsApp
   args = SynParamsApp <$> try' mempty (spaces *> positional)
                       <*> try         (spaces *> rest)
-                      <*>             (spaces *> keywords) where
+                      <*> try' mempty (spaces *> keywords) where
 
     positional = (expression `sepBy1` some space) <?> "positional arguments"
 
@@ -126,11 +125,8 @@ unwrappedInvoke = (SynInvokation <$> expression <*> args >>= pureExpr) <?> "func
               name  = synIdentifier <?> "keyword name"
               colon = consumeKind LpKindColon <?> "suffix"
 
-propableExpressions :: Monad m => [Parser m SynExpr]
-propableExpressions = [contextual, string, symbol, identifier]
-
 quoteableExpressions :: Monad m => [Parser m SynExpr]
-quoteableExpressions = propableExpressions <> [property]
+quoteableExpressions = [contextual, string, symbol, reference, number]
 
 expression :: Monad m => Parser m SynExpr
 expression = choice (quote : quoteableExpressions) <?> "expression"
@@ -139,12 +135,6 @@ comment :: Monad m => Parser m SynExpr
 comment = consume >>= \case
   LpComment com -> pureExpr (SynComment com)
   token         -> throwFromHere (PUnexpectedToken token)
-
-property :: Monad m => Parser m SynExpr
-property = ((conn <$> expr <*> prop) >>= pureExpr) <?> "property" where
-  expr = choice propableExpressions
-  conn e p = SynReference (RefProperty e p)
-  prop = consumeKind LpKindDotOperator *> synIdentifier
 
 quote :: Monad m => Parser m SynExpr
 quote = (tick *> (SynQuote <$> expr) >>= pureExpr) <?> "quote" where
@@ -157,6 +147,12 @@ string = (SynStringLit <$> stringToken >>= pureExpr) <?> "string" where
     LpString string -> pure string
     token           -> throwFromHere (PUnexpectedToken token)
 
+number :: Monad m => Parser m SynExpr
+number = (consume >>= fn) <?> "number" where
+  fn (LpNumberLit (LpInteger i)) = pureExpr (SynNumLit (SynIntLit i))
+  fn (LpNumberLit (LpFloat   f)) = pureExpr (SynNumLit (SynFltLit f))
+  fn t                           = throwFromHere (PUnexpectedToken t)
+
 symbol :: Monad m => Parser m SynExpr
 symbol = (colon *> (SynSymbol <$> synIdentifier) >>= pureExpr) <?> "symbol" where
   colon  = consumeKind LpKindColon
@@ -165,9 +161,24 @@ contextual :: Monad m => Parser m SynExpr
 contextual = (dot *> (SynContextual <$> synIdentifier) >>= pureExpr) <?> "contextual" where
   dot = consumeKind LpKindDotOperator
 
-identifier :: Monad m => Parser m SynExpr
-identifier = (SynReference . RefIdentity <$> id >>= pureExpr) <?> "identifier" where
-  id = synIdentifier <* failKind LpKindColon
+reference :: Monad m => Parser m SynExpr
+reference = ref mempty <?> "identifier" where
+
+  reduceRef :: Monad m => Seq (Position, SynId) -> Parser m SynExpr
+  reduceRef (viewl ->         EmptyL) = throwFromHere PImpossible
+  reduceRef (viewl -> (p, x) :< rest) = iter rest (SynExpr (SynReference (RefIdentity x)) p) where
+    iter :: Monad m => Seq (Position, SynId) -> SynExpr -> Parser m SynExpr
+    iter (viewl ->         EmptyL) acc = pure acc
+    iter (viewl -> (p, x) :< rest) acc = iter rest (SynExpr (SynReference (RefProperty acc x)) p)
+
+  ref :: Monad m => Seq (Position, SynId) -> Parser m SynExpr
+  ref acc = do
+    item <- (,) <$> use position' <*> synIdentifier
+    lookAhead consume >>= \case
+      LpDotOperator -> consume >> ref (acc |> item)
+      LpColon       -> throwFromHere (PUnexpectedToken LpColon)
+      _______       -> reduceRef (acc |> item)
+
 
 newline :: Monad m => Parser m ()
 newline = void (consumeKind LpKindNewline) <?> "newline"
@@ -196,11 +207,17 @@ sepBy1 elem sep = elem >>= \e -> iter (mempty |> e) where
     Just item -> iter (acc |> item)
     Nothing   -> pure acc
 
+sepEndBy1 :: Parser m a -> Parser m b -> Parser m (Seq a)
+sepEndBy1 elem sep = (sepBy1 elem sep) <* sep
+
 lookAhead :: Parser m a -> Parser m a
 lookAhead p = startRecovery *> p <* restoreRecovery
 
 try :: Parser m a -> Parser m (Maybe a)
-try p = (Just <$> p) <|> pure Nothing
+try p = do
+  startRecovery
+  catchError (Just <$> p <* forgetRecovery) $ \e ->
+    restoreRecovery >> pure Nothing
 
 try' :: a -> Parser m a -> Parser m a
 try' a p = fromMaybe a <$> try p

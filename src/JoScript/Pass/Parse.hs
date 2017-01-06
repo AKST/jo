@@ -5,6 +5,7 @@ import Prelude (undefined)
 import Protolude hiding (State, undefined, try)
 
 import Data.Sequence ((|>))
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Conduit as C
@@ -15,7 +16,14 @@ import Control.Lens ((.=), (%=), use, view)
 
 import JoScript.Util.Conduit (ResultSink, Result)
 import JoScript.Data.Config (FileBuildConfig(..), filename')
-import JoScript.Data.Error (Error(..), known, Repr(ParseError), ParseErrorT(..), newestError)
+import JoScript.Data.Error ( Error(..)
+                           , known
+                           , Location(..)
+                           , Repr(ParseError)
+                           , ParseErrorT(..)
+                           , newestError
+                           , Label(..)
+                           )
 import JoScript.Data.Syntax ( SynModule(..)
                             , SynExpr(..)
                             , SynExprRepr(..)
@@ -32,9 +40,6 @@ import qualified JoScript.Data.Position as Position
 data Recovery
   = RecEnd
   | RecAdd State [LexerPass]
-  deriving (Show, Eq)
-
-data Label = Label { position :: Position, description :: Text }
   deriving (Show, Eq)
 
 data State = S { recovery :: Recovery, labels :: Labels, position :: Position }
@@ -88,44 +93,47 @@ root :: Monad m => Parser m SynModule
 root = SynModule <$> block <*> view filename'
 
 block :: Monad m => Parser m (Seq SynExpr)
-block = iter mempty where
+block = iter mempty <?> "block" where
   iter acc = newItem acc <|> emptyLine <|> end where
     emptyLine = newline >> iter acc
     end       = consumeIf Lexer.isEnd >> pure acc
 
   newItem acc = do
-    item <- statement <* newline
+    item <- statement <* endOfLine
     iter (acc |> item)
 
 statement :: Monad m => Parser m SynExpr
-statement = comment
-        <|> unwrappedInvoke
+statement = parser <?> "statement" where
+  parser = comment <|> unwrappedInvoke
 
 unwrappedInvoke :: Monad m => Parser m SynExpr
-unwrappedInvoke = SynInvokation <$> func <*> args >>= pureExpr where
-  func = expression <* some space
+unwrappedInvoke = (SynInvokation <$> expression <*> args >>= pureExpr) <?> "function call" where
 
   args :: Monad m => Parser m SynParamsApp
-  args = SynParamsApp <$> positional <*> rest <*> keywords where
+  args = SynParamsApp <$> try' mempty (spaces *> positional)
+                      <*> try         (spaces *> rest)
+                      <*>             (spaces *> keywords) where
 
-    positional = expression `sepBy1` some space
+    positional = (expression `sepBy1` some space) <?> "positional arguments"
 
-    rest = pure Nothing
+    rest = consumeIf Lexer.isRestOperator *> expression
 
     keywords :: Monad m => Parser m (Map SynId SynExpr)
-    keywords = (Map.fromList . toList) <$> pairs
-      where pairs   = pair `sepBy` some space
-            pair    = (,) <$> (keyword <* some space) <*> expression
-            keyword = synIdentifier <* consumeIf Lexer.isColon
+    keywords = (Map.fromList . toList <$> pairs) <?> "keyword arguments"
+      where pairs   = pair `sepBy1` spaces
+            pair    = (,) <$> keyword <*> (expression <?> "keyword value")
+            keyword = (name <* colon <* spaces) <?> "keyword" where
+              name  = synIdentifier <?> "keyword name"
+              colon = consumeIf Lexer.isColon <?> "suffix"
 
 propableExpressions :: Monad m => [Parser m SynExpr]
 propableExpressions = [contextual, string, symbol, identifier]
 
 quoteableExpressions :: Monad m => [Parser m SynExpr]
-quoteableExpressions = property : propableExpressions
+quoteableExpressions = propableExpressions <> [property]
 
 expression :: Monad m => Parser m SynExpr
-expression = choice (quote : quoteableExpressions)
+expression = choice (quote : quoteableExpressions) <?> "expression"
 
 comment :: Monad m => Parser m SynExpr
 comment = consume >>= \case
@@ -133,38 +141,46 @@ comment = consume >>= \case
   token         -> throwFromHere (PUnexpectedToken token)
 
 property :: Monad m => Parser m SynExpr
-property = (conn <$> expr <*> prop) >>= pureExpr where
+property = ((conn <$> expr <*> prop) >>= pureExpr) <?> "property" where
   expr = choice propableExpressions
   conn e p = SynReference (RefProperty e p)
   prop = consumeIf Lexer.isDotOperator *> synIdentifier
 
 quote :: Monad m => Parser m SynExpr
-quote = tick *> (SynQuote <$> expr) >>= pureExpr where
+quote = (tick *> (SynQuote <$> expr) >>= pureExpr) <?> "quote" where
   tick = consumeIf Lexer.isQuote
   expr = choice quoteableExpressions
 
 string :: Monad m => Parser m SynExpr
-string = (SynStringLit <$> stringToken) >>= pureExpr where
+string = (SynStringLit <$> stringToken >>= pureExpr) <?> "string" where
   stringToken = consume >>= \case
     LpString string -> pure string
     token           -> throwFromHere (PUnexpectedToken token)
 
 symbol :: Monad m => Parser m SynExpr
-symbol = colon *> (SynSymbol <$> synIdentifier) >>= pureExpr where
-  colon = consumeIf Lexer.isColon
+symbol = (colon *> (SynSymbol <$> synIdentifier) >>= pureExpr) <?> "symbol" where
+  colon  = consumeIf Lexer.isColon
 
 contextual :: Monad m => Parser m SynExpr
-contextual = dot *> (SynContextual <$> synIdentifier) >>= pureExpr where
+contextual = (dot *> (SynContextual <$> synIdentifier) >>= pureExpr) <?> "contextual" where
   dot = consumeIf Lexer.isDotOperator
 
 identifier :: Monad m => Parser m SynExpr
-identifier = (SynReference . RefIdentity <$> synIdentifier) >>= pureExpr
+identifier = parser <?> "identifier" where
+  parser = (SynReference . RefIdentity <$> synIdentifier <* notColon) >>= pureExpr
+  notColon = failIf (consumeIf Lexer.isColon)
 
 newline :: Monad m => Parser m ()
-newline = void (consumeIf Lexer.isNewline)
+newline = void (consumeIf Lexer.isNewline) <?> "newline"
+
+endOfLine :: Monad m => Parser m ()
+endOfLine = newline <|> void (lookAhead (consumeIf Lexer.isEnd))
 
 space :: Monad m => Parser m ()
-space = void (consumeIf Lexer.isSpace)
+space = void (consumeIf Lexer.isSpace) <?> "space"
+
+spaces :: Monad m => Parser m ()
+spaces = void (some (consumeIf Lexer.isSpace)) <?> "spaces"
 
 synIdentifier :: Monad m => Parser m SynId
 synIdentifier = consume >>= \case
@@ -175,18 +191,20 @@ synIdentifier = consume >>= \case
 --                   Parse Combinators                      --
 --------------------------------------------------------------
 
-sepBy :: Parser m a -> Parser m b -> Parser m (Seq a)
-sepBy elem sep = (elem `sepBy1` sep) <|> pure mempty
-
-
 sepBy1 :: Parser m a -> Parser m b -> Parser m (Seq a)
 sepBy1 elem sep = elem >>= \e -> iter (mempty |> e) where
   iter acc = try (sep *> elem) >>= \case
     Just item -> iter (acc |> item)
     Nothing   -> pure acc
 
+lookAhead :: Parser m a -> Parser m a
+lookAhead p = startRecovery *> p <* restoreRecovery
+
 try :: Parser m a -> Parser m (Maybe a)
 try p = (Just <$> p) <|> pure Nothing
+
+try' :: a -> Parser m a -> Parser m a
+try' a p = fromMaybe a <$> try p
 
 failIf :: Parser m LpRepr -> Parser m ()
 failIf m = try m >>= \case
@@ -205,11 +223,8 @@ pureExpr expr = do
 throwFromHere :: ParseErrorT -> Parser m a
 throwFromHere err = do
   pos <- use position'
-  throwKnown err pos
-
-throwKnown :: ParseErrorT -> Position -> Parser m a
-throwKnown err pos =
-  throwError (known (ParseError err) pos)
+  lbs <- use labels'
+  throwError (Error (ParseError err lbs) (Known pos))
 
 consume :: Monad m => Parser m LpRepr
 consume = do
@@ -225,14 +240,27 @@ consumeIf predicate = consume >>= \repr ->
 
 rawAwait :: Monad m => Parser m LexerPass
 rawAwait = liftConduit C.await >>= \case
-  Nothing -> do
-    pos <- use position'
-    throwError (known (ParseError PUnexpectedEnd) pos)
+  Nothing ->
+    throwFromHere PUnexpectedEnd
   Just (Left error) ->
     throwError error
   Just (Right item@(Lp _ position)) -> do
     position' .= position
     pure item
+
+--------------------------------------------------------------
+--                   Label Specification                    --
+--------------------------------------------------------------
+
+infixr 0 <?>
+
+(<?>) :: Parser m a -> Text -> Parser m a
+parser <?> description = push *> parser <* pop where
+  push = do
+    position <- use position'
+    labels' %= ((:) Label { position, description })
+  pop = do
+    labels' %= List.tail
 
 --------------------------------------------------------------
 --                     Parse Recovery                       --
@@ -243,42 +271,43 @@ record pass = use recovery' >>= \case
   RecEnd        -> pure ()
   RecAdd s prev -> recovery' .= RecAdd s (pass:prev)
 
-{- # activateRecovery
+{- # startRecovery
  -
  - Any calls to await will also be recorded so if a recoverable
  - error takes place any fetched items during parse can be
  - recovered -}
-activateRecovery :: Parser m ()
-activateRecovery = do
+startRecovery :: Parser m ()
+startRecovery = do
   state     <- get
   recovery' .= RecAdd state mempty
 
 {- # forgetRecovery
  -
  - Discard the cache of any awaited items since the previous
- - call to `activateRecovery` -}
+ - call to `startRecovery` -}
 forgetRecovery :: Parser m ()
 forgetRecovery = use recovery' >>= \case
   RecEnd      -> pure ()
   RecAdd st _ -> recovery' .= (recovery st)
 
-{- # applyRecovery
+{- # restoreRecovery
  -
  - Restores all cached lexicons to the previous state -}
-applyRecovery :: Parser m ()
-applyRecovery = use recovery' >>= \case
+restoreRecovery :: Parser m ()
+restoreRecovery = use recovery' >>= \case
   RecEnd       -> pure ()
   RecAdd st sv -> put st *> liftConduit (forM_ sv (C.leftover . Right))
 
 instance Alternative (Parser m) where
   empty = do
     pos <- use position'
-    throwError (known (ParseError PIncompleteAlt) pos)
+    lbs <- use labels'
+    throwError (Error (ParseError PIncompleteAlt lbs) (Known pos))
 
   left <|> right = do
-    activateRecovery
+    startRecovery
     catchError (left <* forgetRecovery) $ \first ->
-      catchError (applyRecovery *> right) $ \second ->
+      catchError (restoreRecovery *> right) $ \second ->
         throwError (newestError first second)
 
 instance MonadPlus (Parser m)

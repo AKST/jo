@@ -18,10 +18,13 @@ data Error = Error Repr Location
 data Location = Known Position
   deriving (Eq, Show)
 
+data Label = Label { position :: Position, description :: Text }
+  deriving (Show, Eq)
+
 data Repr
   = IndentError IndentErrorT
   | LexerError LexerErrorT
-  | ParseError ParseErrorT
+  | ParseError ParseErrorT [Label]
   deriving (Eq, Show)
 
 data IndentErrorT
@@ -53,7 +56,7 @@ known k p = Error k (Known p)
 reprDescription :: Repr -> Text
 reprDescription (IndentError _) = "text:block"
 reprDescription (LexerError _) = "text:lexer"
-reprDescription (ParseError _) = "text:parse"
+reprDescription (ParseError _ _) = "text:parse"
 
 lexerErrMsg :: LexerErrorT -> Text
 lexerErrMsg LUnexpectedEnd           = "unexpected lexer ended"
@@ -86,11 +89,14 @@ instance A.ToJSON Location where
   toJSON (Known p) = withObject ["type" .= knownS] (A.toJSON p) where
     knownS = "known" :: Text
 
+instance A.ToJSON Label where
+  toJSON Label{..} = A.object ["description" .= description, "position" .= position]
+
 instance A.ToJSON Repr where
   toJSON t = withObject ["level" .= reprDescription t] (withType t) where
     withType (IndentError err) = A.toJSON err
-    withType (LexerError  err) = A.toJSON err
-    withType (ParseError  err) = A.toJSON err
+    withType (LexerError err) = A.toJSON err
+    withType (ParseError err lbs) = withObject ["path" .= lbs] (A.toJSON err)
 
 instance A.ToJSON IndentErrorT where
   toJSON ShallowDedent = A.object ["message" .= ("dedent depth is too shallow" :: Text)]

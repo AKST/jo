@@ -109,6 +109,7 @@ loop (StartToken line) = withLine line where
     withHead '|'  = emit LpPipe
     withHead '='  = emit LpAssign
     withHead ':'  = emit LpColon
+    withHead '-'  = continueToken lexSInt
     withHead ' '  = continueToken lexWhitespace
     withHead '#'  = continueToken lexComment
     withHead '"'  = continueToken lexString
@@ -175,16 +176,26 @@ lexString t i
       else EmitStep (i + 1) (LpString . T.tail . T.init)
   | otherwise          = NextStep
 
+lexSInt :: Text -> Int -> TokenBranchStep
+lexSInt t i
+  | i < 1  && h == '-'        = NextStep
+  | i == 1 && not (isDigit h) = JumpStep i lexIdentifier
+  | i > 0  && isDigit h       = NextStep
+  | i > 1  && h == '.'        = JumpStep (i + 1) lexFloat
+  | isNumTerminator h         = EmitStep i (LpInteger . T.readInt)
+  | otherwise                 = FailStep (LInvalidIntSuffix h)
+  where h = T.index t i
+
 lexUInt :: Text -> Int -> TokenBranchStep
 lexUInt t i
   | isDigit h         = NextStep
-  | h == '.'          = JumpStep (i + 1) lexUFloat
+  | h == '.'          = JumpStep (i + 1) lexFloat
   | isNumTerminator h = EmitStep i (LpInteger . T.readInt)
   | otherwise         = FailStep (LInvalidIntSuffix h)
   where h = T.index t i
 
-lexUFloat :: Text -> Int -> TokenBranchStep
-lexUFloat t i
+lexFloat :: Text -> Int -> TokenBranchStep
+lexFloat t i
   | isDigit h         = NextStep
   | isNumTerminator h = EmitStep i (LpFloat . T.readFloat)
   | h == '.'          = FailStep LDuplicateDecimial

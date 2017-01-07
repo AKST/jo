@@ -28,6 +28,7 @@ tests =
   , TestLabel "JoScript.Pass.Parse (application pos rest)"    parseAppPosRest
   , TestLabel "JoScript.Pass.Parse (application pos kw)"      parseAppPosKeywords
   , TestLabel "JoScript.Pass.Parse (application pos rest kw)" parseAppPosRestKeywords
+  , TestLabel "JoScript.Pass.Parse (application nested)"      parseAppNestedCall
   ]
 
 --------------------------------------------------------------
@@ -68,7 +69,7 @@ parseAppPos = TestCase $ do
     , LpInteger 2
     , LpEnd ]
   assertEqual "module result" (statements mod)
-    [ invoke (idExpr "add") [SynIntLit 2, SynIntLit 2] Nothing mempty ]
+    [ invoke (idExpr "add") [int 2, int 2] Nothing mempty ]
 
 -- add 2 *numbers
 parseAppPosRest = TestCase $ do
@@ -81,7 +82,7 @@ parseAppPosRest = TestCase $ do
     , LpIdentifier "numbers"
     , LpEnd ]
   assertEqual "module result" (statements mod)
-    [ invoke (idExpr "add") [SynIntLit 2] (Just (idExpr "numbers")) mempty ]
+    [ invoke (idExpr "add") [int 2] (Just (idExpr "numbers")) mempty ]
 
 -- add 2 overflow: true
 parseAppPosKeywords = TestCase $ do
@@ -96,7 +97,7 @@ parseAppPosKeywords = TestCase $ do
     , LpIdentifier "true"
     , LpEnd ]
   assertEqual "module result" (statements mod)
-    [ invoke (idExpr "add") [SynIntLit 2] Nothing [("overflow", idExpr "true")] ]
+    [ invoke (idExpr "add") [int 2] Nothing [("overflow", idExpr "true")] ]
 
 -- add 2 *numbers overflow: true
 parseAppPosRestKeywords = TestCase $ do
@@ -114,7 +115,35 @@ parseAppPosRestKeywords = TestCase $ do
     , LpIdentifier "true"
     , LpEnd ]
   assertEqual "module result" (statements mod)
-    [ invoke (idExpr "add") [SynIntLit 2] (Just (idExpr "numbers")) [("overflow", idExpr "true")] ]
+    [ invoke (idExpr "add") [int 2] (Just (idExpr "numbers")) [("overflow", idExpr "true")] ]
+
+-- mul [sub 70 1] [add 900 11]
+parseAppNestedCall = TestCase $ do
+  mod <- getModule
+    [ LpIdentifier "mul"
+    , LpSpace 1
+    , LpBraceL
+    , LpIdentifier "sub"
+    , LpSpace 1
+    , LpInteger 70
+    , LpSpace 1
+    , LpInteger 1
+    , LpBraceR
+    , LpSpace 1
+    , LpBraceL
+    , LpIdentifier "add"
+    , LpSpace 1
+    , LpInteger 900
+    , LpSpace 1
+    , LpInteger 11
+    , LpBraceR
+    , LpEnd ]
+  assertEqual "parses correctly" (statements mod)
+    [ invoke ( idExpr "mul" )
+             [ invoke ( idExpr "sub" ) [int  70, int  1] empty mempty
+             , invoke ( idExpr "add" ) [int 900, int 11] empty mempty ]
+             empty
+             mempty ]
 
 --------------------------------------------------------------
 --                         Numbers                          --
@@ -138,12 +167,12 @@ parseFloat = TestCase $ do
 --                     expression dsl                       --
 --------------------------------------------------------------
 
-invoke :: SynExpr -> Seq SynExprRepr -> Maybe SynExpr -> [(Text, SynExpr)] -> SynExpr
+int n = expr' (SynIntLit n)
+
+invoke :: SynExpr -> Seq SynExpr -> Maybe SynExpr -> [(Text, SynExpr)] -> SynExpr
 invoke fn args rest keywords = expr' (SynInvokation fn apply)
   where toExpr (label, ex) = (SynId label, ex)
-        apply = SynParamsApp (fmap expr' args)
-                             rest
-                             (Map.fromList (fmap toExpr keywords))
+        apply = SynParamsApp args rest (Map.fromList (fmap toExpr keywords))
 
 
 invokeExpr e = expr' (SynInvokation (expr' e) defApply)

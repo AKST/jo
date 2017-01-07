@@ -27,6 +27,7 @@ tests =
   , TestLabel "JoScript.Pass.Parse (application pos)"         parseAppPos
   , TestLabel "JoScript.Pass.Parse (application pos rest)"    parseAppPosRest
   , TestLabel "JoScript.Pass.Parse (application pos kw)"      parseAppPosKeywords
+  , TestLabel "JoScript.Pass.Parse (application rest kw)"     parseAppRestKeywords
   , TestLabel "JoScript.Pass.Parse (application pos rest kw)" parseAppPosRestKeywords
   , TestLabel "JoScript.Pass.Parse (application nested)"      parseAppNestedCall
   ]
@@ -99,6 +100,22 @@ parseAppPosKeywords = TestCase $ do
   assertEqual "module result" (statements mod)
     [ invoke (idExpr "add") [int 2] Nothing [("overflow", idExpr "true")] ]
 
+-- add *numbers overflow: true
+parseAppRestKeywords = TestCase $ do
+  mod <- getModule
+    [ LpIdentifier "add"
+    , LpSpace 1
+    , LpRestOperator
+    , LpIdentifier "numbers"
+    , LpSpace 1
+    , LpIdentifier "overflow"
+    , LpColon
+    , LpSpace 1
+    , LpIdentifier "true"
+    , LpEnd ]
+  assertEqual "module result" (statements mod)
+    [ invoke (idExpr "add") [] (Just (idExpr "numbers")) [("overflow", idExpr "true")] ]
+
 -- add 2 *numbers overflow: true
 parseAppPosRestKeywords = TestCase $ do
   mod <- getModule
@@ -167,6 +184,7 @@ parseFloat = TestCase $ do
 --                     expression dsl                       --
 --------------------------------------------------------------
 
+int :: Integer -> SynExpr
 int n = expr' (SynIntLit n)
 
 invoke :: SynExpr -> Seq SynExpr -> Maybe SynExpr -> [(Text, SynExpr)] -> SynExpr
@@ -174,13 +192,16 @@ invoke fn args rest keywords = expr' (SynInvokation fn apply)
   where toExpr (label, ex) = (SynId label, ex)
         apply = SynParamsApp args rest (Map.fromList (fmap toExpr keywords))
 
-
+invokeExpr :: SynExprRepr -> SynExpr
 invokeExpr e = expr' (SynInvokation (expr' e) defApply)
 
+defApply :: SynParamsApp
 defApply = SynParamsApp mempty Nothing mempty
 
+idExpr :: Text -> SynExpr
 idExpr = expr' . SynReference . RefIdentity . SynId
 
+expr' :: SynExprRepr -> SynExpr
 expr' r = SynExpr r Position.init
 
 --------------------------------------------------------------

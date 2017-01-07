@@ -60,9 +60,11 @@ getLexerReprs tokens = extract <$> (runParse tokens >>= withSuccess) where
 
   withSuccess :: FileDebug -> IO (Seq LexerPass)
   withSuccess (FileDebug { output = PDebugLexer p, error = Nothing }) = pure p
-  withSuccess (FileDebug {                         error = Just er }) = assertFailure (ppShow er) >> undefined
-  withSuccess (FileDebug { output = _____________, error = Nothing }) = assertFailure message >> undefined
-    where message = "unexpected pass debug target"
+  withSuccess (FileDebug {                         error = Just er }) = failMessage (ppShow er)
+  withSuccess (FileDebug { output = _____________, error = Nothing }) =
+    failMessage "unexpected pass debug target"
+
+  failMessage m = assertFailure m >> undefined
 
   runParse :: [BpRepr] -> IO FileDebug
   runParse ts = runFileBuildM config (runConduitRes conduit) where

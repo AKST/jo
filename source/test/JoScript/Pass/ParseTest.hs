@@ -26,8 +26,8 @@ tests =
   , TestLabel "JoScript.Pass.Parse (symbol)"                  parseSymbol
   , TestLabel "JoScript.Pass.Parse (application pos)"         parseAppPos
   , TestLabel "JoScript.Pass.Parse (application pos rest)"    parseAppPosRest
-  , TestLabel "JoScript.Pass.Parse (application pos kw)"      parseAppPosKeywords
-  , TestLabel "JoScript.Pass.Parse (application rest kw)"     parseAppRestKeywords
+  , TestLabel "JoScript.Pass.Parse (application pos      kw)" parseAppPosKeywords
+  , TestLabel "JoScript.Pass.Parse (application     rest kw)" parseAppRestKeywords
   , TestLabel "JoScript.Pass.Parse (application pos rest kw)" parseAppPosRestKeywords
   , TestLabel "JoScript.Pass.Parse (application nested)"      parseAppNestedCall
   ]

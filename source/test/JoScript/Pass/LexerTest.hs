@@ -21,9 +21,10 @@ import qualified JoScript.Data.Position as Position
 
 tests :: [Test]
 tests =
-  [ TestLabel "JoScript.Pass.Lexer (integers)" lexerUnsignedInteger
-  , TestLabel "JoScript.Pass.Lexer (floats)"   lexerUnsignedFloat
-  , TestLabel "JoScript.Pass.Lexer (integers)" lexerSignedInteger
+  [ TestLabel "JoScript.Pass.Lexer (integers)"        lexerUnsignedInteger
+  , TestLabel "JoScript.Pass.Lexer (floats)"          lexerUnsignedFloat
+  , TestLabel "JoScript.Pass.Lexer (signed integers)" lexerSignedInteger
+  , TestLabel "JoScript.Pass.Lexer (signed floats)"   lexerSignedFloat
   ]
 
 --------------------------------------------------------------
@@ -41,6 +42,10 @@ lexerUnsignedFloat = TestCase $ do
 lexerSignedInteger = TestCase $ do
   tokens <- getLexerReprs [ BpLine "-123" ]
   assertEqual "line of int should equal" tokens [ LpInteger (-123) ]
+
+lexerSignedFloat = TestCase $ do
+  tokens <- getLexerReprs [ BpLine "-69.11" ]
+  assertEqual "line of int should equal" tokens [ LpFloat (-69.11) ]
 
 --------------------------------------------------------------
 --                         Utility                          --

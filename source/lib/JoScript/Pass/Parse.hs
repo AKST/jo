@@ -26,7 +26,6 @@ import JoScript.Data.Error ( Error(..)
                            )
 import JoScript.Data.Syntax ( SynModule(SynModule)
                             , SynExpr(..)
-                            , SynNumLitT(..)
                             , SynExprRepr(..)
                             , SynParamsApp(..)
                             , SynParamsDef(..)
@@ -173,8 +172,8 @@ expression = choice (quote : quoteableExpressions) <?> "expression" where
   -- number literals
   number :: Monad m => Parser m SynExpr
   number = (consume >>= fn) <?> "number" where
-    fn (LpInteger i) = pureExpr (SynNumLit (SynIntLit i))
-    fn (LpFloat   f) = pureExpr (SynNumLit (SynFltLit f))
+    fn (LpInteger i) = pureExpr (SynIntLit i)
+    fn (LpFloat   f) = pureExpr (SynFltLit f)
     fn t             = throwFromHere (PUnexpectedToken t)
 
   symbol :: Monad m => Parser m SynExpr

@@ -32,11 +32,6 @@ data Ref
   | RefProperty SynExpr SynId
   deriving (Show, Eq)
 
-data SynNumLitT
-  = SynIntLit Int
-  | SynFltLit Float
-  deriving (Show, Eq)
-
 -- SynParamsApp
 --   meaning: syntax for syntax invokation
 --   example: [fn $apply $apply $apply *$apply $def: $apply $def: $apply]
@@ -96,8 +91,8 @@ data SynExprRepr where
   --   arg-2.1
   SynBlock :: SynParamsDef -> Seq SynExpr -> SynExprRepr
 
-  -- just number literals
-  SynNumLit :: SynNumLitT -> SynExprRepr
+  SynIntLit :: Integer -> SynExprRepr
+  SynFltLit :: Double -> SynExprRepr
 
   -- string literals
   SynStringLit :: SynStringLitT -> SynExprRepr
@@ -123,8 +118,8 @@ exprType (SynInvokation _ _) = "invokation"
 exprType (SynDeclaration (RefIdentity   _) _) = "declarion:identity"
 exprType (SynDeclaration (RefProperty _ _) _) = "declarion:property"
 exprType (SynBlock _ _) = "block"
-exprType (SynNumLit (SynIntLit _)) = "integer"
-exprType (SynNumLit (SynFltLit _)) = "float"
+exprType (SynIntLit _) = "integer"
+exprType (SynFltLit _) = "float"
 exprType (SynStringLit _) = "string"
 exprType (SynComment _) = "comment"
 
@@ -171,8 +166,8 @@ instance A.ToJSON SynExprRepr where
     forKind (SynInvokation func args) = ["invoked" .= func, "arguments" .= args]
     forKind (SynDeclaration r value)  = ["reference" .= r, "value" .= value]
     forKind (SynBlock def statements) = ["arguments" .= def, "statements" .= statements]
-    forKind (SynNumLit (SynIntLit i)) = ["integer" .= i]
-    forKind (SynNumLit (SynFltLit i)) = ["float" .= i]
+    forKind (SynIntLit i)             = ["integer" .= i]
+    forKind (SynFltLit i)             = ["float" .= i]
     forKind (SynStringLit string)     = ["string" .= string]
     forKind (SynComment commment)     = ["contents" .= commment]
 

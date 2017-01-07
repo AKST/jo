@@ -30,8 +30,8 @@ data LpRepr
   | LpDotOperator
   | LpDecoratorPrefix
   | LpIdentifier Text
-  | LpInteger Int
-  | LpFloat Float
+  | LpInteger Integer
+  | LpFloat Double
   | LpString Text
   | LpComment Text
   deriving (Eq, Show)

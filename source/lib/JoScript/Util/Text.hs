@@ -11,10 +11,10 @@ foldlM f init bsInit = impl (pure init) bsInit where
     | T.null bs = acc
     | otherwise = impl (acc >>= \acc' -> f acc' (T.head bs)) (T.tail bs)
 
-readInt :: Text -> Int
+readInt :: Text -> Integer
 readInt = read . T.unpack
 
-readFloat :: Text -> Float
+readFloat :: Text -> Double
 readFloat = read . T.unpack
 
 

@@ -30,7 +30,7 @@ data LpRepr
   | LpDotOperator
   | LpDecoratorPrefix
   | LpIdentifier Text
-  | LpInteger Word64
+  | LpInteger Int
   | LpFloat Float
   | LpString Text
   | LpComment Text

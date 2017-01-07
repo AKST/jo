@@ -11,7 +11,7 @@ foldlM f init bsInit = impl (pure init) bsInit where
     | T.null bs = acc
     | otherwise = impl (acc >>= \acc' -> f acc' (T.head bs)) (T.tail bs)
 
-readInt :: Text -> Word64
+readInt :: Text -> Int
 readInt = read . T.unpack
 
 readFloat :: Text -> Float

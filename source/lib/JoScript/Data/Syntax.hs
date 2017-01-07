@@ -33,7 +33,7 @@ data Ref
   deriving (Show, Eq)
 
 data SynNumLitT
-  = SynIntLit Word64
+  = SynIntLit Int
   | SynFltLit Float
   deriving (Show, Eq)
 

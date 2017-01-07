@@ -29,6 +29,7 @@ import JoScript.Data.Syntax ( SynModule(SynModule)
                             , SynNumLitT(..)
                             , SynExprRepr(..)
                             , SynParamsApp(..)
+                            , SynParamsDef(..)
                             , Ref(..)
                             , SynId(SynId)
                             )
@@ -106,6 +107,7 @@ statement :: Monad m => Parser m SynExpr
 statement = parser <?> "statement" where
   parser = comment <|> unwrappedInvoke
 
+{- a function invokation unwrapped an top level -}
 unwrappedInvoke :: Monad m => Parser m SynExpr
 unwrappedInvoke = (SynInvokation <$> expression <*> args >>= pureExpr) <?> "function call" where
   args :: Monad m => Parser m SynParamsApp
@@ -125,61 +127,88 @@ unwrappedInvoke = (SynInvokation <$> expression <*> args >>= pureExpr) <?> "func
               name  = synIdentifier <?> "keyword name"
               colon = consumeKind LpKindColon <?> "suffix"
 
-quoteableExpressions :: Monad m => [Parser m SynExpr]
-quoteableExpressions = [nestedCall, contextual, string, symbol, reference, number]
-
+{- expressions -}
 expression :: Monad m => Parser m SynExpr
-expression = choice (quote : quoteableExpressions) <?> "expression"
+expression = choice (quote : quoteableExpressions) <?> "expression" where
 
-nestedCall :: Monad m => Parser m SynExpr
-nestedCall = (consumeKind LpKindBraceL) *> unwrappedInvoke <* (consumeKind LpKindBraceR)
+  lambda :: Monad m => Parser m SynExpr
+  lambda = do
+    pos   <- use position'
+    block <- (SynBlock <$> parameters <*> lines) <?> "lambda"
+    pure (SynExpr block pos) where
 
+      parameters :: Monad m => Parser m SynParamsDef
+      parameters = (pipe >> whitespace) *> def <* (whitespace >> pipe) where
+        whitespace = try spaces
+        pipe       = consumeKind LpKindPipe
+        def = SynParamsDef <$> try' mempty positional <*> pure Nothing <*> pure mempty where
+          positional :: Monad m => Parser m (Seq SynId)
+          positional = (synIdentifier `sepBy1` spaces)
+
+      lines :: Monad m => Parser m (Seq SynExpr)
+      lines = start *> statements <* end where
+        start = newline *> consumeKind LpKindIndent
+        end   = newline *> consumeKind LpKindDedent
+
+  -- every expression can be quoted with the exection of say quotes.
+  quoteableExpressions :: Monad m => [Parser m SynExpr]
+  quoteableExpressions = [nestedInvoke, contextual, string, symbol, reference, number, lambda]
+
+  -- a function invokation wrapped
+  nestedInvoke :: Monad m => Parser m SynExpr
+  nestedInvoke = (consumeKind LpKindBraceL) *> unwrappedInvoke <* (consumeKind LpKindBraceR)
+
+  -- quoted syntax
+  quote :: Monad m => Parser m SynExpr
+  quote = (tick *> (SynQuote <$> expr) >>= pureExpr) <?> "quote" where
+    tick = consumeKind LpKindQuote
+    expr = choice quoteableExpressions
+
+  -- string literals
+  string :: Monad m => Parser m SynExpr
+  string = (SynStringLit <$> stringToken >>= pureExpr) <?> "string" where
+    stringToken = consume >>= \case
+      LpString string -> pure string
+      token           -> throwFromHere (PUnexpectedToken token)
+
+  -- number literals
+  number :: Monad m => Parser m SynExpr
+  number = (consume >>= fn) <?> "number" where
+    fn (LpNumberLit (LpInteger i)) = pureExpr (SynNumLit (SynIntLit i))
+    fn (LpNumberLit (LpFloat   f)) = pureExpr (SynNumLit (SynFltLit f))
+    fn t                           = throwFromHere (PUnexpectedToken t)
+
+  symbol :: Monad m => Parser m SynExpr
+  symbol = (colon *> (SynSymbol <$> synIdentifier) >>= pureExpr) <?> "symbol" where
+    colon  = consumeKind LpKindColon
+
+  contextual :: Monad m => Parser m SynExpr
+  contextual = (dot *> (SynContextual <$> synIdentifier) >>= pureExpr) <?> "contextual" where
+    dot = consumeKind LpKindDotOperator
+
+  reference :: Monad m => Parser m SynExpr
+  reference = ref mempty <?> "identifier" where
+    reduceRef :: Monad m => Seq (Position, SynId) -> Parser m SynExpr
+    reduceRef (viewl ->         EmptyL) = throwFromHere PImpossible
+    reduceRef (viewl -> (p, x) :< rest) = iter rest (SynExpr (SynReference (RefIdentity x)) p) where
+      iter :: Monad m => Seq (Position, SynId) -> SynExpr -> Parser m SynExpr
+      iter (viewl ->         EmptyL) acc = pure acc
+      iter (viewl -> (p, x) :< rest) acc = iter rest (SynExpr (SynReference (RefProperty acc x)) p)
+
+    ref :: Monad m => Seq (Position, SynId) -> Parser m SynExpr
+    ref acc = do
+      item <- (,) <$> use position' <*> synIdentifier
+      lookAhead consume >>= \case
+        LpDotOperator -> consume >> ref (acc |> item)
+        LpColon       -> throwFromHere (PUnexpectedToken LpColon)
+        _______       -> reduceRef (acc |> item)
+
+
+-- trailing comments
 comment :: Monad m => Parser m SynExpr
 comment = consume >>= \case
   LpComment com -> pureExpr (SynComment com)
   token         -> throwFromHere (PUnexpectedToken token)
-
-quote :: Monad m => Parser m SynExpr
-quote = (tick *> (SynQuote <$> expr) >>= pureExpr) <?> "quote" where
-  tick = consumeKind LpKindQuote
-  expr = choice quoteableExpressions
-
-string :: Monad m => Parser m SynExpr
-string = (SynStringLit <$> stringToken >>= pureExpr) <?> "string" where
-  stringToken = consume >>= \case
-    LpString string -> pure string
-    token           -> throwFromHere (PUnexpectedToken token)
-
-number :: Monad m => Parser m SynExpr
-number = (consume >>= fn) <?> "number" where
-  fn (LpNumberLit (LpInteger i)) = pureExpr (SynNumLit (SynIntLit i))
-  fn (LpNumberLit (LpFloat   f)) = pureExpr (SynNumLit (SynFltLit f))
-  fn t                           = throwFromHere (PUnexpectedToken t)
-
-symbol :: Monad m => Parser m SynExpr
-symbol = (colon *> (SynSymbol <$> synIdentifier) >>= pureExpr) <?> "symbol" where
-  colon  = consumeKind LpKindColon
-
-contextual :: Monad m => Parser m SynExpr
-contextual = (dot *> (SynContextual <$> synIdentifier) >>= pureExpr) <?> "contextual" where
-  dot = consumeKind LpKindDotOperator
-
-reference :: Monad m => Parser m SynExpr
-reference = ref mempty <?> "identifier" where
-  reduceRef :: Monad m => Seq (Position, SynId) -> Parser m SynExpr
-  reduceRef (viewl ->         EmptyL) = throwFromHere PImpossible
-  reduceRef (viewl -> (p, x) :< rest) = iter rest (SynExpr (SynReference (RefIdentity x)) p) where
-    iter :: Monad m => Seq (Position, SynId) -> SynExpr -> Parser m SynExpr
-    iter (viewl ->         EmptyL) acc = pure acc
-    iter (viewl -> (p, x) :< rest) acc = iter rest (SynExpr (SynReference (RefProperty acc x)) p)
-
-  ref :: Monad m => Seq (Position, SynId) -> Parser m SynExpr
-  ref acc = do
-    item <- (,) <$> use position' <*> synIdentifier
-    lookAhead consume >>= \case
-      LpDotOperator -> consume >> ref (acc |> item)
-      LpColon       -> throwFromHere (PUnexpectedToken LpColon)
-      _______       -> reduceRef (acc |> item)
 
 newline :: Monad m => Parser m ()
 newline = void (consumeKind LpKindNewline) <?> "newline"

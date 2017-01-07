@@ -27,6 +27,7 @@ library
                      , JoScript.Data.Syntax
                      , JoScript.Data.Error
                      , JoScript.Data.Block
+                     , JoScript.Data.Debug
                      , JoScript.Data.Lexer
                      , JoScript.Data.Config
                      , JoScript.Config.ArgParsing

@@ -172,7 +172,7 @@ lexString :: Text -> Int -> TokenBranchStep
 lexString t i
   | '"' <- T.index t i = if i == 0
       then NextStep
-      else EmitStep (i + 1) (LpString . T.drop 1)
+      else EmitStep (i + 1) (LpString . T.tail . T.init)
   | otherwise          = NextStep
 
 lexUInt :: Text -> Int -> TokenBranchStep

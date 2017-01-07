@@ -8,9 +8,11 @@ import qualified Data.Aeson.Types as A
 
 
 import JoScript.Data.Position (Position)
-import JoScript.Data.Block as Bp
-import JoScript.Data.Lexer as Lp
 import JoScript.Util.Json (withObject)
+import JoScript.Data.Lexer (LpRepr(..), LpReprKind(..))
+import qualified JoScript.Data.Block as Bp
+import qualified JoScript.Data.Lexer as Lp
+
 
 data Error = Error Repr Location
   deriving (Eq, Show)
@@ -18,10 +20,13 @@ data Error = Error Repr Location
 data Location = Known Position
   deriving (Eq, Show)
 
+data Label = Label { position :: Position, description :: Text }
+  deriving (Show, Eq)
+
 data Repr
   = IndentError IndentErrorT
   | LexerError LexerErrorT
-  | ParseError ParseErrorT
+  | ParseError ParseErrorT [Label]
   deriving (Eq, Show)
 
 data IndentErrorT
@@ -39,7 +44,9 @@ data LexerErrorT
 
 data ParseErrorT
   = PUnexpectedEnd
+  | PImpossible
   | PIncompleteAlt
+  | PExpectedToken LpReprKind LpRepr
   | PUnexpectedToken LpRepr
   deriving (Eq, Show)
 
@@ -53,7 +60,7 @@ known k p = Error k (Known p)
 reprDescription :: Repr -> Text
 reprDescription (IndentError _) = "text:block"
 reprDescription (LexerError _) = "text:lexer"
-reprDescription (ParseError _) = "text:parse"
+reprDescription (ParseError _ _) = "text:parse"
 
 lexerErrMsg :: LexerErrorT -> Text
 lexerErrMsg LUnexpectedEnd           = "unexpected lexer ended"
@@ -67,6 +74,8 @@ parseErrMsg :: ParseErrorT -> Text
 parseErrMsg PUnexpectedEnd = "unexpected parse end during parse"
 parseErrMsg PIncompleteAlt = "implementation error"
 parseErrMsg PUnexpectedToken{} = "encounted unexpected token"
+parseErrMsg PExpectedToken{} = "Expected different token"
+parseErrMsg PImpossible = "Impossible error"
 
 {- Determines which error is most recently occuring in a file -}
 newestError :: Error -> Error -> Error
@@ -86,11 +95,14 @@ instance A.ToJSON Location where
   toJSON (Known p) = withObject ["type" .= knownS] (A.toJSON p) where
     knownS = "known" :: Text
 
+instance A.ToJSON Label where
+  toJSON Label{..} = A.object ["description" .= description, "position" .= position]
+
 instance A.ToJSON Repr where
   toJSON t = withObject ["level" .= reprDescription t] (withType t) where
     withType (IndentError err) = A.toJSON err
-    withType (LexerError  err) = A.toJSON err
-    withType (ParseError  err) = A.toJSON err
+    withType (LexerError err) = A.toJSON err
+    withType (ParseError err lbs) = withObject ["path" .= lbs] (A.toJSON err)
 
 instance A.ToJSON IndentErrorT where
   toJSON ShallowDedent = A.object ["message" .= ("dedent depth is too shallow" :: Text)]
@@ -105,6 +117,7 @@ instance A.ToJSON LexerErrorT where
 
 instance A.ToJSON ParseErrorT where
   toJSON t = withObject ["message" .= parseErrMsg t] (withType t) where
-    withType (PUnexpectedToken t) = A.object ["token" .= t]
+    withType (PUnexpectedToken t) = A.object ["read" .= t]
+    withType (PExpectedToken e t) = A.object ["read" .= t, "expected-type" .= e]
     withType ____________________ = A.object []
 

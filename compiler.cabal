@@ -22,7 +22,7 @@ flag production
   default:     False
 
 library
-  hs-source-dirs:      src
+  hs-source-dirs:      source/lib
   exposed-modules:     JoScript.Data.Position
                      , JoScript.Data.Syntax
                      , JoScript.Data.Error
@@ -83,7 +83,7 @@ library
                , -Wname-shadowing
 
 executable client
-  hs-source-dirs:      client
+  hs-source-dirs:      source/client
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base, compiler, protolude
@@ -92,7 +92,7 @@ executable client
 
 test-suite compiler-test
   type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
+  hs-source-dirs:      source/test
   main-is:             Spec.hs
   other-modules:       JoScript.Util.TextTest
                      , JoScript.Util.StringsTest

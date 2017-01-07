@@ -1,0 +1,9 @@
+let gcd | x y |
+  if [< x y] then:
+    .return [gcd x y]
+
+  modded := % x y
+  if [= modded 0] then:
+    .return y
+  else:
+    .return [gcd y modded]

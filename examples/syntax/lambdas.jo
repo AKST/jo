@@ -1,0 +1,2 @@
+http.get "/api/resource" |response|
+  http.put "/api/resource" [encode response as: 'json]

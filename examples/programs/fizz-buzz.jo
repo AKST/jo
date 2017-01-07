@@ -1,0 +1,22 @@
+.namespace :fizz-buzz |
+  [:guard :for :num :range :stdout *std] := .use :std.prelude
+
+@export
+fizz-buzz := |i|
+  eq   := std.eq num
+  show := std.show num
+  .ret guard |
+    .case eq 0 [num.mod i by: 15] | "fizzbuzz"
+    .case eq 0 [num.mod i by:  5] | "buzz"
+    .case eq 0 [num.mod i by:  3] | "fizz"
+    .else                         | show i
+
+@export as-main: std.true
+main := | *args |
+  # single line expression
+  for [range 1 100] [ i | std.write stdout [fizz-buzz i]]
+
+  # new line expresssion
+  for [range 1 100] | i |
+    std.write stdout [fizz-buzz i]
+

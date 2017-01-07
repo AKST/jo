@@ -1,0 +1,31 @@
+#namespace :main |
+  [type with match try] := #import std.lang
+  [dict vec fn result] := #import std.util
+  [db json: [parser]] := #import std.data
+
+
+it-json-file := fn.iter | f keys |
+  lookup := fn | element keys | match keys
+    #case vec.singleton | head |
+      try [go-to element head]
+    #case vec.headsplit | head tail |
+      lookup [try [go-to parser head]] tail
+
+  with [parser.open file] | root |
+    element := try [lookup root keys]
+    parser.free root
+    for [json.children element] | child |
+      #emit [parser.as-dict child]
+      parser.free root
+
+#export as-main: true
+main := fn.void | environment *args |
+  data-source := args 0
+  user, pswd  := dict.lookup environment "DB_USER" "DB_PASSWORD"
+  with [db.connect user pswd] | conn |
+    for [it-json-file data-source [:documents :data]] | child |
+      title, date, owner :=
+        dict.lookup child :document-name :published :owner
+      document-row := [record owner := user-id title := title date := date]
+      db.table "documents" .insert document-row
+

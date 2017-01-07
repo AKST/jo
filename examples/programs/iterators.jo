@@ -1,0 +1,100 @@
+# note that alot of these is being made up as I go
+
+# export & type-sig are invoked like dectorators but
+# are actually compile time evaulated macros
+
+# import is the only protected word
+
+import type ( trait fn map str num bool iter: it | from std.type
+import lang ( export do type macro ) from std.lang
+import io ( stdout ) from std.io
+
+# syntax inside type signature are treated as a different language
+
+@type.sig (macro (vec *(* :: object)))
+': macro | macro.match
+  parens *exprs => fn.apply type.vec exprs
+  otherwise: ex => macro.unexpected-err [args] |
+    expected:   macro.paren
+    suggestion: "(${ex})"
+
+# a block macro can be expressed in the following ways
+#
+#  var: fn | expression
+#
+#  var: fn |
+#    expression
+#
+#  var: [fn| expressions]
+#
+#  var: fn | args | expression
+#
+#  var: [fn | args | expression]
+#
+#  var: [fn] |
+#    expression
+#
+#  var: [fn] | expression
+
+
+# traits are very much like typeclasses in haskell similar
+# to parametised modules but server a different purpose
+
+@trait args: (self -> target)
+serialise: |
+  to-target: self -> target
+
+# The function type is defined internally but can be
+# expressed like this if with the languages semantics.
+#
+#   fn: type | type args |
+#     type: type
+#     args: vec type <> void
+#       default ()
+#
+
+@export as: counter
+@type.sig (fn (it num))
+make-counter: it |
+  (:get :set): lang
+  value: ref 0
+  while bool::true
+    it::yield (get value)
+    set value (add value 1)
+
+
+@type.sig (fn '(str void))
+log: fn | message |
+  io.write stdout message
+
+
+# since `fn` is an interface, for invokable objects a
+# the type for unevaluated template strings can be
+# generalised as type (fn string) with serlislisable
+# arguments.
+
+# template-str: type | args |
+#   args: vec (any a)
+#     where a in serialise a str
+
+@type.sig (fn '(a: serialise * str | a str))
+@type.sig (template-str (*))
+string: "I am a templates string, $s"
+
+@export as: main
+@type-sig (fn '(io.environment void) args: str)
+with-args: fn | environment *args |
+  counter: make-counter
+  end-val: lang.ref counter.next!
+
+  while (lt (lang.random 1 10) 9)
+    lang.set end-val counter.next!
+
+  # sting interpolation, is denoted by ${} for expressions
+  # be evaluated in the string, the type of the value must
+  # implementent the (serialise self str) trait
+  log "Your random number is ${end-val}."
+
+  # string templates can also be invoked as functions
+  log ("Your random number is $?" end-val)
+

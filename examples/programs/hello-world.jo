@@ -1,0 +1,4 @@
+# hello world
+.import 'jo.lang as: 'std
+
+std.write std.stdout "hello world"

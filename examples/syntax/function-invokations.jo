@@ -1,0 +1,6 @@
+http.get "/api/resource" 123 69.11 as: 'json
+http.get "/api/resource" 123 69.11 *abc as: 'json
+http.get "/api/resource" *abc as: 'json
+http.get "/api/resource" as: 'json timeout: 123
+http.put "/api/resource" [db.query 'blog id: 1] as: 'json
+.export 123

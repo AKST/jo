@@ -1,0 +1,57 @@
+module := #namespace |
+  #import [:Option]            from: :std.data.option
+  #import [:compare :ord]      from: :std.util
+  #import [:type :match :Bool] from: :std.lang
+
+
+@module.export include-constructors: Bool.True
+Tree := type.enum | k v self: Tree |
+  Branch := k -> v -> Tree k v -> Tree k v -> Tree k v
+  Empty  := Tree k v
+
+
+@module.export
+init := [Branch.empty]
+
+
+@module.export
+insert := | self ik iv |
+  match self |
+    Tree.Branch | ok ov l r | match ~compare ik ok |
+      Ord.Lt | Tree.Branch ok ov   [insert l ik iv] r
+      Ord.Gt | Tree.Branch ok ov l [insert r ik iv]
+      Ord.Eq | Tree.Branch ik iv l r
+    Tree.Empty |
+      Tree.Branch ik iv Tree.Empty Tree.Empty
+
+
+@module.export
+delete := | self key |
+  match self |
+    Tree.Empty | Tree.Empty
+    Tree.Branch | ok _ l r | match ~compare key ok |
+      Ord.Lt | Tree.Branch ok ov   [delete l key] r
+      Ord.Gt | Tree.Branch ok ov l [delete r key]
+      Ord.Eq | Tree.Empty
+
+
+
+@module.export
+lookup := | self key |
+  match self |
+    Tree.Empty  | Option.None
+    Tree.Branch | ok v l r | match ~compare key ok |
+      Ord.Lt | Tree.Branch ok ov   [delete l key] r
+      Ord.Gt | Tree.Branch ok ov l [delete r key]
+      Ord.Eq | Option.Some v
+
+
+@module.export
+contains := | self key |
+  match self |
+    Tree.Empty  | Bool.False
+    Tree.Branch | ok v l r | match ~compare key ok |
+      Ord.Lt | Tree.Branch ok ov   [delete l key] r
+      Ord.Gt | Tree.Branch ok ov l [delete r key]
+      Ord.Eq | Option.Some v
+

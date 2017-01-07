@@ -1,0 +1,142 @@
+# Identifiers prefixed with `.` are contextual meaning it doesn't need
+# to be defined in the context it exists. This helps me avoids defining
+# reserved keywords for the language. They are generally bound by a caller
+#
+# `out` is being passed in as module parameter, so yes this language does
+# have a concept of ML functors, however they'er not being used to implement
+# typeclasses and stuff.
+#
+# Note this allows you to pipe a bunch of concatenated files directly into
+# the compiler lol. I remember seeing a tweet by Gary Bernhardt saying this
+# so I figured yeah that seems like a cool idea.
+#
+# Another reason to do this, is to avoid having seperate semantics for
+# defining modules signatures for a file verses inner modules in a file, like
+# say in ocaml. Interface / header files are so 1980
+.define 'akst.simple where: |out-factory|
+  # This language does not have a standard prelude it has to be explictly
+  # imported by the user. This allows for the prelude to be deprecated and
+  # modified.
+  #
+  # This is actually a macro that will expose these values to the name space
+  #
+  # Also this language has no concept unqualified imports, why? I honestly
+  # hate unqualified imports, it just makes reading code hard if you don't
+  # know much about the imported modules
+  .import jo.lang
+    with: [match type lazy math eq ->]
+    poly: [i32-show i32-math i32-eq]
+    as:   std
+
+
+  # Explict type checking is writing much like a statement, this keeps the
+  # parameter list of functions readable and doesn't discourage people from
+  # writing overally specific type signatures.
+  #
+  # If I choose to make this language static then it's reasonable to assume
+  # type checking is actually run at compile time. I think the biggest
+  # drawback of this approach is it's not very declarive
+  #
+  # I'd like to infer as much of this as possible 😒
+  type.assert out-factory
+    implements: std.writer-factory
+
+  # Types are values at runtime as well, here we're defining a enum type,
+  # more formally know as a varient type, but I'm taking rust and swifts
+  # lead and giving them a less intemidating name. Bite me purists 😭
+  #
+  # ALSO! We're defining this type in a function so we reuse the block
+  # syntax for this, and evaluation of the block actually happens at
+  # compile time.
+  Result := type.define-enum as: |self a|
+    .case 'None     type: a -> [self a]
+    .case 'Fizz     type: [self a]
+    .case 'Buzz     type: [self a]
+    .case 'FizzBuzz type: [self a]
+
+
+  # This language has implict values which are statically infered by their
+  # usage. They're a similar concept to Haskell's type classes, but they
+  # have more in common with Scala's implicts and OCaml modules
+  result-to-str := type.define-impl
+    with: [[ a | Result [.that a implements: std.to-str] ]]
+    assoc: std.to-str
+    where: |result|
+      # here we're performing a pattern match on the result with
+      # the match function
+      .return
+        match result of: |
+          .case Result.FizzBuzz [[ "fizzbuzz" ]]
+          .case Result.Fizz [[ "fizz" ]]
+          .case Result.Buzz [[ "buzz" ]]
+          .case Result.None |n|
+            type.assert n implements: std.to-str
+            .return std.to-str n
+
+
+  # pattern matching does not occur in the parameter list, this is just to
+  # keep the parameter list clean. I honestly don't like how haskell does
+  # all that in it's parameter list. You could probably define a macro to
+  # do this if, you're that attached to that approach
+  int-to-result := |number|
+    # This will be automatic but I'm just demostrating how you would
+    # explictly check the type of a function parameter, in this case
+    # we're checking if it implements certain implicts
+    type.assert-impl math eq in: number
+
+    # Here we're creating a few cases for the guard, and these cases can
+    # just be argumentless functions. Originally i had a lazy macro but
+    # then I realised this could be much simpiler
+    #
+    # So yeah we're denoting this is a function by using the double
+    # brackets which seperates this from nested function innovoation
+    div-3 := [[ eq 0 [math.mod number 3] ]]
+    div-5 := [[ eq 0 [math.mod number 5] ]]
+    both  := [[ std.and [div-3] [div-5] ]]
+
+    # since `std.guard` is accepting a block as a parameter we put it on
+    # a new line with additional indentation, this communicates that any
+    # following parameters are being passed to an inner function vs' the
+    # outer function. We could just wrap it in [[ and ]] but I personally
+    # think that looks gross 😷  Then again this may look gross to some
+    # people too, ¯\_(ツ)_/¯
+    .return
+      std.guard |
+        .case both  | Result.FizzBuzz
+        .case div-3 | Result.Fizz
+        .case div-5 | Result.Buzz
+        .case 'else | Result.None number
+
+
+  # This is just a main for running this program
+  main := |
+    # one awkward thing about the syntax for argumentless functions
+    # is distingishing between invoking them as a top level expression
+    # and passing the function as a value. I thought maybe I can go the
+    # route of ruby (I think) and haskell and treat values as functions
+    # that return their value ??? but then how do i assign the function.
+    #
+    # This isn't a pure lazy language I want to be able to pass stuff
+    # argumentless effectful functions places where they can be invoked
+    # not the value it self. So I've opted to make invokation of these
+    # functions explict, I would love to a have
+    out := [out-factory.get-instance]
+
+    writeln := |value|
+      message := std.to-str value
+      std.write out message
+
+    std.for [std.range 1 100] |num|
+      writeln [int-to-result num]
+
+
+  # here we're exporting these names to modules that import this
+  # module. `behave-as` is used for specifying meta data like if
+  # this modules to defines a main function or if it has a default
+  # export like ES2015 does.
+  .export show-result   behave-as: '[implict]
+  .export main          behave-as: '[script main default]
+  .export int-to-result        as: 'with-int
+  .export Result with-constructors: true
+
+

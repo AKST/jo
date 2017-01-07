@@ -22,6 +22,8 @@ tests :: [Test]
 tests =
   [ TestLabel "JoScript.Pass.Parse (integers)"                parseInteger
   , TestLabel "JoScript.Pass.Parse (floats)"                  parseFloat
+  , TestLabel "JoScript.Pass.Parse (identifier)"              parseIdentifier
+  , TestLabel "JoScript.Pass.Parse (property)"                parseProperty
   , TestLabel "JoScript.Pass.Parse (identifier quote)"        parseIdentifierQuote
   , TestLabel "JoScript.Pass.Parse (symbol)"                  parseSymbol
   , TestLabel "JoScript.Pass.Parse (application pos)"         parseAppPos
@@ -31,6 +33,26 @@ tests =
   , TestLabel "JoScript.Pass.Parse (application pos rest kw)" parseAppPosRestKeywords
   , TestLabel "JoScript.Pass.Parse (application nested)"      parseAppNestedCall
   ]
+
+--------------------------------------------------------------
+--                      References                          --
+--------------------------------------------------------------
+
+parseIdentifier = TestCase $ do
+  mod <- getModule
+    [ LpIdentifier "abc"
+    , LpEnd ]
+  assertEqual "module result" (statements mod)
+    [ invokeExpr' (idExpr "abc") ]
+
+parseProperty = TestCase $ do
+  mod <- getModule
+    [ LpIdentifier "abc"
+    , LpDotOperator
+    , LpIdentifier "efg"
+    , LpEnd ]
+  assertEqual "module result" (statements mod)
+    [ invokeExpr' (idExpr "abc" `withProp` "efg") ]
 
 --------------------------------------------------------------
 --                        Symbols                           --
@@ -192,8 +214,14 @@ invoke fn args rest keywords = expr' (SynInvokation fn apply)
   where toExpr (label, ex) = (SynId label, ex)
         apply = SynParamsApp args rest (Map.fromList (fmap toExpr keywords))
 
+withProp :: SynExpr -> Text -> SynExpr
+withProp ex prop = expr' (SynReference (RefProperty ex (SynId prop)))
+
 invokeExpr :: SynExprRepr -> SynExpr
 invokeExpr e = expr' (SynInvokation (expr' e) defApply)
+
+invokeExpr' :: SynExpr -> SynExpr
+invokeExpr' e = expr' (SynInvokation e defApply)
 
 defApply :: SynParamsApp
 defApply = SynParamsApp mempty Nothing mempty

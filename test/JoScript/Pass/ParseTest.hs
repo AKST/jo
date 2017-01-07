@@ -19,8 +19,23 @@ import JoScript.Pass.Parse (runParsePass)
 
 tests :: [Test]
 tests =
-  [ TestLabel "JoScript.Pass.Parse (numbers)" parseInteger
+  [ TestLabel "JoScript.Pass.Parse (integers)" parseInteger
+  , TestLabel "JoScript.Pass.Parse (floats)" parseFloat
+  , TestLabel "JoScript.Pass.Parse (identifier quote)" parseIdentifierQuote
   ]
+
+--------------------------------------------------------------
+--                         Quotes                           --
+--------------------------------------------------------------
+
+parseIdentifierQuote = TestCase $ do
+  let tokens = [ LpQuote
+               , LpIdentifier "abc"
+               , LpEnd
+               ]
+  mod <- runParse tokens >>= withSuccess
+  assertEqual "module result" (statements mod)
+    [ invokeExpr (SynQuote (idExpr "abc")) ]
 
 --------------------------------------------------------------
 --                         Numbers                          --
@@ -31,7 +46,7 @@ parseInteger = TestCase $ do
                , LpEnd
                ]
   mod <- runParse tokens >>= withSuccess
-  assertEqual "module result" (exprs mod)
+  assertEqual "module result" (statements mod)
     [ invokeExpr (SynNumLit (SynIntLit 20)) ]
 
 parseFloat = TestCase $ do
@@ -39,18 +54,24 @@ parseFloat = TestCase $ do
                , LpEnd
                ]
   mod <- runParse tokens >>= withSuccess
-  assertEqual "module result" (exprs mod)
+  assertEqual "module result" (statements mod)
     [ invokeExpr (SynNumLit (SynFltLit 420.6911)) ]
+
+--------------------------------------------------------------
+--                     expression dsl                       --
+--------------------------------------------------------------
+
+invokeExpr e = expr' (SynInvokation (expr' e) defApply)
+
+defApply = SynParamsApp mempty Nothing mempty
+
+idExpr = expr' . SynReference . RefIdentity . SynId
+
+expr' r = SynExpr r Position.init
 
 --------------------------------------------------------------
 --                         Utility                          --
 --------------------------------------------------------------
-
-invokeExpr e = ex (SynInvokation (ex e) defApply)
-
-defApply = SynParamsApp mempty Nothing mempty
-
-ex r = SynExpr r Position.init
 
 withSuccess :: Show b => Either b a -> IO a
 withSuccess (Left  b) = assertFailure (ppShow b) >> undefined
@@ -62,5 +83,3 @@ runParse ts = runFileBuildM config (runConduitRes conduit) where
   config = FileBC "test"
   source = sourceList (fmap (\x -> Right (Lp x Position.init)) ts)
 
-exprs :: SynModule -> Seq SynExpr
-exprs (SynModule { statements }) = statements

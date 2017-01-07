@@ -19,10 +19,24 @@ import JoScript.Pass.Parse (runParsePass)
 
 tests :: [Test]
 tests =
-  [ TestLabel "JoScript.Pass.Parse (integers)" parseInteger
-  , TestLabel "JoScript.Pass.Parse (floats)" parseFloat
+  [ TestLabel "JoScript.Pass.Parse (integers)"         parseInteger
+  , TestLabel "JoScript.Pass.Parse (floats)"           parseFloat
   , TestLabel "JoScript.Pass.Parse (identifier quote)" parseIdentifierQuote
+  , TestLabel "JoScript.Pass.Parse (symbol)"           parseSymbol
   ]
+
+--------------------------------------------------------------
+--                        Symbols                           --
+--------------------------------------------------------------
+
+parseSymbol = TestCase $ do
+  let tokens = [ LpColon
+               , LpIdentifier "abc"
+               , LpEnd
+               ]
+  mod <- runParse tokens >>= withSuccess
+  assertEqual "module result" (statements mod)
+    [ invokeExpr (SynSymbol (SynId "abc")) ]
 
 --------------------------------------------------------------
 --                         Quotes                           --

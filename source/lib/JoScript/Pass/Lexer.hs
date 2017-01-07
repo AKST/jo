@@ -11,7 +11,7 @@ import Control.Lens ((%=), (.=), use)
 import JoScript.Data.Error (Error(..), Repr(LexerError), LexerErrorT(..), known)
 import JoScript.Data.Position (Position)
 import JoScript.Data.Block (BlockPass(..), BpRepr(..))
-import JoScript.Data.Lexer (LexerPass(..), LpRepr(..), LpNumber(..))
+import JoScript.Data.Lexer (LexerPass(..), LpRepr(..))
 import qualified JoScript.Data.Lexer as Lp
 import qualified JoScript.Data.Error as Error
 import qualified JoScript.Data.Position as Position
@@ -179,14 +179,14 @@ lexUInt :: Text -> Int -> TokenBranchStep
 lexUInt t i
   | isDigit h         = NextStep
   | h == '.'          = JumpStep (i + 1) lexUFloat
-  | isNumTerminator h = EmitStep i (LpNumberLit . LpInteger . T.readInt)
+  | isNumTerminator h = EmitStep i (LpInteger . T.readInt)
   | otherwise         = FailStep (LInvalidIntSuffix h)
   where h = T.index t i
 
 lexUFloat :: Text -> Int -> TokenBranchStep
 lexUFloat t i
   | isDigit h         = NextStep
-  | isNumTerminator h = EmitStep i (LpNumberLit . LpFloat . T.readFloat)
+  | isNumTerminator h = EmitStep i (LpFloat . T.readFloat)
   | h == '.'          = FailStep LDuplicateDecimial
   | otherwise         = FailStep (LInvalidIntSuffix h)
   where h = T.index t i

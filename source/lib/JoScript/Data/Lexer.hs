@@ -14,11 +14,6 @@ import JoScript.Data.Position (Position)
 data LexerPass = Lp { repr :: LpRepr, position :: Position }
   deriving (Eq, Show)
 
-data LpNumber
-  = LpInteger Word64
-  | LpFloat Float
-  deriving (Eq, Show)
-
 data LpRepr
   = LpEnd
   | LpSpace Word64
@@ -35,7 +30,8 @@ data LpRepr
   | LpDotOperator
   | LpDecoratorPrefix
   | LpIdentifier Text
-  | LpNumberLit LpNumber
+  | LpInteger Word64
+  | LpFloat Float
   | LpString Text
   | LpComment Text
   deriving (Eq, Show)
@@ -84,8 +80,8 @@ reprKind LpDecoratorPrefix = LpKindDecoratorPrefix
 reprKind (LpIdentifier _)  = LpKindIdentifier
 reprKind (LpString _)      = LpKindString
 reprKind (LpComment _)     = LpKindComment
-reprKind (LpNumberLit (LpFloat _))   = LpKindFloatLit
-reprKind (LpNumberLit (LpInteger _)) = LpKindIntegerLit
+reprKind (LpFloat _)       = LpKindFloatLit
+reprKind (LpInteger _)     = LpKindIntegerLit
 
 --------------------------------------------------------------
 --                         helpers                          --
@@ -112,8 +108,8 @@ kindName LpKindRestOperator = "rest"
 kindName LpKindDotOperator = "."
 kindName LpKindDecoratorPrefix = "decorator"
 kindName LpKindIdentifier = "identifier"
-kindName LpKindIntegerLit = "number:integer"
-kindName LpKindFloatLit = "number:float"
+kindName LpKindIntegerLit = "integer"
+kindName LpKindFloatLit = "float"
 
 
 instance A.ToJSON LexerPass where
@@ -128,12 +124,12 @@ instance A.ToJSON LpRepr where
     default' :: A.Value
     default' = A.object ["type" .= reprKind token]
 
-    withType (LpString s)                = withObject ["value" .= s] default'
-    withType (LpComment c)               = withObject ["value" .= c] default'
-    withType (LpIdentifier i)            = withObject ["value" .= i] default'
-    withType (LpNumberLit (LpFloat f))   = withObject ["value" .= f] default'
-    withType (LpNumberLit (LpInteger i)) = withObject ["value" .= i] default'
-    withType _                           = default'
+    withType (LpString s)     = withObject ["value" .= s] default'
+    withType (LpComment c)    = withObject ["value" .= c] default'
+    withType (LpIdentifier i) = withObject ["value" .= i] default'
+    withType (LpFloat f)      = withObject ["value" .= f] default'
+    withType (LpInteger i)    = withObject ["value" .= i] default'
+    withType _                = default'
 
 
 

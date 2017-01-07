@@ -36,7 +36,6 @@ import JoScript.Data.Syntax ( SynModule(SynModule)
 import JoScript.Data.Position (Position)
 import JoScript.Data.Lexer ( LexerPass(..)
                            , LpRepr(..)
-                           , LpNumber(..)
                            , LpReprKind(..)
                            , reprKind)
 import qualified JoScript.Data.Lexer as Lexer
@@ -174,9 +173,9 @@ expression = choice (quote : quoteableExpressions) <?> "expression" where
   -- number literals
   number :: Monad m => Parser m SynExpr
   number = (consume >>= fn) <?> "number" where
-    fn (LpNumberLit (LpInteger i)) = pureExpr (SynNumLit (SynIntLit i))
-    fn (LpNumberLit (LpFloat   f)) = pureExpr (SynNumLit (SynFltLit f))
-    fn t                           = throwFromHere (PUnexpectedToken t)
+    fn (LpInteger i) = pureExpr (SynNumLit (SynIntLit i))
+    fn (LpFloat   f) = pureExpr (SynNumLit (SynFltLit f))
+    fn t             = throwFromHere (PUnexpectedToken t)
 
   symbol :: Monad m => Parser m SynExpr
   symbol = (colon *> (SynSymbol <$> synIdentifier) >>= pureExpr) <?> "symbol" where

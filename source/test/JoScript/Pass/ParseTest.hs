@@ -55,14 +55,14 @@ parseIdentifierQuote = TestCase $ do
 
 parseInteger = TestCase $ do
   mod <- getModule
-    [ LpNumberLit (LpInteger 20)
+    [ LpInteger 20
     , LpEnd ]
   assertEqual "module result" (statements mod)
     [ invokeExpr (SynNumLit (SynIntLit 20)) ]
 
 parseFloat = TestCase $ do
   mod <- getModule
-    [ LpNumberLit (LpFloat 420.6911)
+    [ LpFloat 420.6911
     , LpEnd ]
   assertEqual "module result" (statements mod)
     [ invokeExpr (SynNumLit (SynFltLit 420.6911)) ]

@@ -30,11 +30,10 @@ tests =
 --------------------------------------------------------------
 
 parseSymbol = TestCase $ do
-  let tokens = [ LpColon
-               , LpIdentifier "abc"
-               , LpEnd
-               ]
-  mod <- runParse tokens >>= withSuccess
+  mod <- getModule
+    [ LpColon
+    , LpIdentifier "abc"
+    , LpEnd ]
   assertEqual "module result" (statements mod)
     [ invokeExpr (SynSymbol (SynId "abc")) ]
 
@@ -43,11 +42,10 @@ parseSymbol = TestCase $ do
 --------------------------------------------------------------
 
 parseIdentifierQuote = TestCase $ do
-  let tokens = [ LpQuote
-               , LpIdentifier "abc"
-               , LpEnd
-               ]
-  mod <- runParse tokens >>= withSuccess
+  mod <- getModule
+    [ LpQuote
+    , LpIdentifier "abc"
+    , LpEnd ]
   assertEqual "module result" (statements mod)
     [ invokeExpr (SynQuote (idExpr "abc")) ]
 
@@ -56,18 +54,16 @@ parseIdentifierQuote = TestCase $ do
 --------------------------------------------------------------
 
 parseInteger = TestCase $ do
-  let tokens = [ LpNumberLit (LpInteger 20)
-               , LpEnd
-               ]
-  mod <- runParse tokens >>= withSuccess
+  mod <- getModule
+    [ LpNumberLit (LpInteger 20)
+    , LpEnd ]
   assertEqual "module result" (statements mod)
     [ invokeExpr (SynNumLit (SynIntLit 20)) ]
 
 parseFloat = TestCase $ do
-  let tokens = [ LpNumberLit (LpFloat 420.6911)
-               , LpEnd
-               ]
-  mod <- runParse tokens >>= withSuccess
+  mod <- getModule
+    [ LpNumberLit (LpFloat 420.6911)
+    , LpEnd ]
   assertEqual "module result" (statements mod)
     [ invokeExpr (SynNumLit (SynFltLit 420.6911)) ]
 
@@ -87,13 +83,16 @@ expr' r = SynExpr r Position.init
 --                         Utility                          --
 --------------------------------------------------------------
 
-withSuccess :: Show b => Either b a -> IO a
-withSuccess (Left  b) = assertFailure (ppShow b) >> undefined
-withSuccess (Right a) = pure a
+getModule :: [LpRepr] -> IO SynModule
+getModule tokens = runParse tokens >>= withSuccess where
 
-runParse :: [LpRepr] -> IO (Either Error SynModule)
-runParse ts = runFileBuildM config (runConduitRes conduit) where
-  conduit = source .| runParsePass
-  config = FileBC "test"
-  source = sourceList (fmap (\x -> Right (Lp x Position.init)) ts)
+  withSuccess :: Show b => Either b a -> IO a
+  withSuccess (Left  b) = assertFailure (ppShow b) >> undefined
+  withSuccess (Right a) = pure a
+
+  runParse :: [LpRepr] -> IO (Either Error SynModule)
+  runParse ts = runFileBuildM config (runConduitRes conduit) where
+    conduit = source .| runParsePass
+    config = FileBC "test"
+    source = sourceList (fmap (\x -> Right (Lp x Position.init)) ts)
 

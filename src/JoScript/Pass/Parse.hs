@@ -100,8 +100,8 @@ root = SynModule <$> block <*> view filename'
   where block = statements <* consumeKind LpKindEnd
 
 statements :: Monad m => Parser m (Seq SynExpr)
-statements = (statement `sepEndBy1` some sep) <?> "block"
-  where sep = try spaces >> newline
+statements = ((statement `sepBy1` some sep) <* try sep) <?> "block"
+  where sep = (try spaces >> newline) <?> "line seperator"
 
 statement :: Monad m => Parser m SynExpr
 statement = parser <?> "statement" where
